@@ -29,14 +29,14 @@ say H 1
 tap A
 wait 110
 say H 2
-tap LEFT
 tap UP
+wait 6
 tap A
 wait 110
-tap RIGHT
-tap RIGHT
 tap DOWN
+wait 6
 tap DOWN
+wait 6
 tap A
 wait 170
 rec stop classic

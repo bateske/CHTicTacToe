@@ -3,6 +3,13 @@
 #include "Draw.h"
 #include "../RamFunc.h"     // hot loops run from SRAM
 
+int16_t drawLo = 0, drawHi = GFX_H;
+
+void drawRows(int lo, int hi) {
+    drawLo = (int16_t)lo; drawHi = (int16_t)hi;
+    gfx_setClip(0, lo, GFX_W, hi - lo);
+}
+
 static inline void plot(uint8_t *p, int x, uint8_t c) {
     if (x & 1) *p = (uint8_t)((*p & 0x0F) | (c << 4));
     else       *p = (uint8_t)((*p & 0xF0) | c);
@@ -69,7 +76,7 @@ RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *rem
         d += n;
         if (scale == 256) {
             // 1:1 (nearly always): a running x.
-            if ((unsigned)(y + j) >= GFX_H) continue;
+            if (y + j < drawLo || y + j >= drawHi) continue;
             uint8_t *row = gfx_fb + (y + j) * GFX_FB_STRIDE;
             int q = x;
             for (uint8_t i = 0; i < n; i++) {
@@ -84,7 +91,7 @@ RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *rem
         // (j + 1) * scale) >> 8, and a run [px, px + len) the columns scaled
         // the same way (trailing transparency is implicit).
         for (int yy = y + ((j * scale) >> 8); yy < y + (((j + 1) * scale) >> 8); yy++) {
-            if ((unsigned)yy >= GFX_H) continue;
+            if (yy < drawLo || yy >= drawHi) continue;
             uint8_t *row = gfx_fb + yy * GFX_FB_STRIDE;
             int px = 0;
             for (uint8_t i = 0; i < n; i++) {
@@ -105,9 +112,9 @@ RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *rem
 // ---------------------------------------------------------------------------
 void dither(int x, int y, int w, int h, uint8_t c, uint8_t phase) {
     if (x < 0) { w += x; x = 0; }
-    if (y < 0) { h += y; y = 0; }
+    if (y < drawLo) { h -= drawLo - y; y = drawLo; }
     if (x + w > GFX_W) w = GFX_W - x;
-    if (y + h > GFX_H) h = GFX_H - y;
+    if (y + h > drawHi) h = drawHi - y;
     if (w <= 0 || h <= 0) return;
     uint8_t cc = (uint8_t)(c | (c << 4));
     for (int j = 0; j < h; j++) {
@@ -177,7 +184,7 @@ RAMFUNC(glyph) void glyph(int x, int y, const uint8_t *cols, uint8_t ncols, uint
         int yy = y;
         uint8_t *p = gfx_fb + yy * GFX_FB_STRIDE + (x >> 1);
         for (; bits; bits >>= 1, yy++, p += GFX_FB_STRIDE)
-            if ((bits & 1) && (unsigned)yy < GFX_H) plot(p, x, c);
+            if ((bits & 1) && yy >= drawLo && yy < drawHi) plot(p, x, c);
     }
 }
 
@@ -212,7 +219,7 @@ RAMFUNC(text35x2) void text35x2(int x, int y, const char *str, uint8_t c) {
                 for (int row = 0; bits; row++, bits >>= 1) {
                     if (!(bits & 1)) continue;
                     int py = y + row * 2;
-                    if ((unsigned)py > GFX_H - 2) continue;
+                    if (py < drawLo || py + 1 >= drawHi) continue;
                     uint8_t *p = gfx_fb + py * GFX_FB_STRIDE + (px >> 1);
                     for (int k = 0; k < 2; k++, p += GFX_FB_STRIDE) {
                         if (!(px & 1)) *p = (uint8_t)(c | (c << 4));

@@ -421,8 +421,13 @@ static void playUpdate() {
         return;
     }
     if (pressed & START_BUTTON) { overlay = OV_PAUSE; pauseSel = 0; audio::sfx(Sfx::Select); return; }
-    if (pressed & SELECT_BUTTON) { overlay = OV_RULES; audio::sfx(Sfx::Select); return; }
+    if (pressed & SELECT_BUTTON) {                       // the iso table <-> the map; else the rules
+        if (stage::canIso(match.b)) { stage::toggleView(); audio::sfx(Sfx::Whoosh); }
+        else { overlay = OV_RULES; audio::sfx(Sfx::Select); }
+        return;
+    }
 
+    match.iso = stage::isoOn(match.b);
     match.update(pressed, rep, stage::busy());
     stage::onEvents(match);
     stage::update(match);

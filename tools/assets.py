@@ -12,6 +12,8 @@ starting a comment line):
   * logo.txt, royale.txt - the title lettering (drafted by tools/make_logo.py).
   * youwon1/2.txt, broke1/2.txt - PPOT's lettering for the end screens.
   * cat1.txt, cat2.txt - the cat that walks across a drawn game.
+  * pieces/*.png + .anchor - the iso pieces (rendered by tools/pieces.py):
+    X, O and GOBBLE's three chips, L for the 3x3 tables and S for the 5x5.
 
 The dealer, faces, lettering and glove come out byte-identical to the arrays
 in CHBlackjack and CHChess: if those repos sit next to this one, the build
@@ -241,6 +243,16 @@ def main():
         cat = load_art(nm + ".txt")
         o.array(nm.upper(), pack_span4(cat), comment=f"the cat {len(cat[0])}x{len(cat)}, row spans")
         preview(nm, cat, bg=3)
+
+    # The iso pieces: the art, then where its base centre is.
+    for sz in ("l", "s"):
+        for nm in ("x", "o", "chip0", "chip1", "chip2"):
+            stem = f"{nm}_{sz}"
+            img = load_png(ART / "pieces" / f"{stem}.png")
+            ax, ay = (int(v) for v in (ART / "pieces" / f"{stem}.anchor").read_text().split())
+            o.array(stem.upper(), pack_span4(img) + [ax, ay],
+                    comment=f"{stem} {len(img[0])}x{len(img)}, row spans, then the base centre x, y")
+            preview(stem, img, bg=3)
 
     # Lettering.
     logo = load_bits("logo.txt")

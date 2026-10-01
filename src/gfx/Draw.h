@@ -12,6 +12,11 @@
 #include <stdint.h>
 #include <CHGfx.h>
 
+// The rows drawing may touch, for redrawing just a band of the screen:
+// these primitives and CHGfx's (through its clip). drawRows(0, GFX_H) resets.
+extern int16_t drawLo, drawHi;
+void drawRows(int lo, int hi);
+
 void fillRound(int x, int y, int w, int h, uint8_t r, uint8_t c);   // r <= 4
 void roundRect(int x, int y, int w, int h, uint8_t r, uint8_t c);
 // fillRound in fill, then roundRect in edge: panels, plates, bubbles.

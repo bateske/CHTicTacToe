@@ -84,7 +84,28 @@ void Match::place(uint8_t cell, uint8_t arg) {
     to(Phase::Settle);
 }
 
+// The iso tables: the cursor goes to the nearest cell that way on screen
+// (CHChess's glove). A cell (u, v) is at screen ((u - v) * 2, u + v), in
+// half tile heights.
+void Match::nudgeIso(uint8_t rep) {
+    int dx = (rep & K_RIGHT) ? 1 : ((rep & K_LEFT) ? -1 : 0), dy = (rep & K_DOWN) ? 1 : ((rep & K_UP) ? -1 : 0);
+    if (!dx && !dy) return;
+    int u0 = cur % b.w, v0 = cur / b.w;
+    uint8_t best = NONE;
+    int bestScore = 0x7FFF;
+    for (uint8_t c = 0; c < b.n; c++) {
+        int u = c % b.w, v = c / b.w;
+        int ex = 2 * ((u - v) - (u0 - v0)), ey = (u + v) - (u0 + v0);
+        int along = dx ? ex * dx : ey * dy, perp = dx ? ey : ex;
+        if (along <= 0) continue;
+        int score = along + 3 * (perp < 0 ? -perp : perp);
+        if (score < bestScore) { bestScore = score; best = c; }
+    }
+    if (best != NONE) { cur = best; emit(EV_MOVE); }
+}
+
 void Match::nudge(uint8_t rep) {
+    if (iso) { nudgeIso(rep); return; }
     int plane = b.w * b.h;
     int x = cur % b.w, y = cur / b.w % b.h, z = cur / plane;
     if (rep & K_LEFT) x--;

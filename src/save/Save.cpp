@@ -9,6 +9,14 @@
 
 namespace save {
 
+#if CHTT_LEAN
+// Device debug builds: no saving (it does not fit beside the protocol).
+bool available() { return false; }
+bool load(Casino &, bool &hasGame) { hasGame = false; return false; }
+bool store(const Casino &, bool) { return false; }
+void allowWrites(bool) {}
+#else
+
 static const uint32_t MAGIC = 0x54544843u;       // "CHTT"
 static const uint8_t VERSION = 1;
 static const uint32_t PAGE = 256;
@@ -171,5 +179,7 @@ bool store(const Casino &c, bool withGame) {
     lastSeq = rec.seq;
     return true;
 }
+
+#endif  // CHTT_LEAN
 
 }  // namespace save

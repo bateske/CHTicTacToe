@@ -3,6 +3,7 @@
 #include <string.h>
 #include "Stage.h"
 #include "ChipArt.h"
+#include "Iso.h"
 #include "../game/Text.h"
 #include "../gfx/Draw.h"
 #include "../gfx/Fmt.h"
@@ -16,11 +17,21 @@ namespace stage {
 
 static const int BOARD_Y0 = 12, BOARD_Y1 = 116;         // between the two bars
 static const int HOME_X = 116 << 4, HOME_Y = 56 << 4;   // where the dealer's glove waits
+static const int HOLD = 14;             // iso: how high a glove holds its piece over the felt
 
 static int16_t gx, gy, tx, ty;          // the glove's fingertip, Q4
 static bool gloveOn, gloveCpu, moving, reaching, dirty;
+static bool moved, wasMoving;           // only the glove or the cursor changed
+static int16_t bandLo = 12, bandHi = 116;   // iso: rows the glove, its piece and the cursor were drawn in
+static uint16_t clockSig;               // BLITZ: what its clock showed
 static uint8_t alertT, busyT, strikeT, tossT, tossWho, quipT, lastPhase;
 static uint16_t catT;
+static bool mapView;                    // the strategy map instead of the iso table
+static uint8_t introT;                  // iso: the board dropping onto the carpet
+static uint8_t dropT, dropCell = NONE;  // iso: a piece falling onto its pad
+static Sfx landSfx;
+static const char *landText;
+static uint8_t landColour;
 static uint32_t lastSig;
 static const char *quip;
 static char note[24];
@@ -32,15 +43,22 @@ struct Geo { int16_t x0, y0; uint8_t cw, r; };
 
 static Geo geo(const Board &b) {
     Geo g;
-    g.cw = b.n == 9 ? 28 : (b.w == 5 ? 18 : (b.w == 7 ? 14 : 11));
-    g.r = b.n == 9 ? 9 : (b.w == 5 ? 6 : (b.w == 7 ? 5 : 3));
+    g.cw = b.n == 9 ? 24 : (b.w == 5 ? 18 : (b.w == 7 ? 14 : 11));
+    g.r = b.n == 9 ? 8 : (b.w == 5 ? 6 : (b.w == 7 ? 5 : 3));
     int gap = (b.flags & F_ULTIMATE) ? 2 : 0;
     g.x0 = (int16_t)((128 - b.w * g.cw - gap) / 2 + 1);
-    g.y0 = (int16_t)(BOARD_Y0 + 1 + (104 - b.h * g.cw - gap) / 2);
+    g.y0 = (int16_t)(BOARD_Y0 + 1 + (104 - b.h * g.cw - gap) / 2 - (b.n == 9 ? 3 : 0));   // 3x3: clear of the stocks
     return g;
 }
 
-static void cellPos(const Board &b, uint8_t cell, int &cx, int &cy) {
+__attribute__((noinline)) bool canIso(const Board &b) { return iso::fits(b); }
+__attribute__((noinline)) bool isoOn(const Board &b) { return iso::fits(b) && !mapView; }
+void toggleView() { mapView = !mapView; dirty = true; bandLo = 12; bandHi = 116; }
+
+static int introLift() { return introT * introT / 5; }
+
+__attribute__((noinline)) static void cellPos(const Board &b, uint8_t cell, int &cx, int &cy) {
+    if (isoOn(b)) { iso::cellPos(iso::view(b, introLift()), cell, cx, cy); return; }
     int x = cell % b.w, y = cell / b.w % b.h;
     if (b.d > 1) {                                       // TOWER: four slanted floors
         int z = cell / 16;
@@ -54,7 +72,10 @@ static void cellPos(const Board &b, uint8_t cell, int &cx, int &cy) {
     cy = g.y0 + y * g.cw + (u ? y / 3 : 0) + (g.cw - 1) / 2;
 }
 
-static uint8_t radius(const Board &b) { return b.d > 1 ? 2 : geo(b).r; }
+static uint8_t radius(const Board &b) {
+    if (isoOn(b)) return b.n == 9 ? 6 : 4;
+    return b.d > 1 ? 2 : geo(b).r;
+}
 
 // ---------------------------------------------------------------------------
 // Marks
@@ -89,15 +110,6 @@ void mark(int cx, int cy, int r, uint8_t sym, uint8_t colour) {
     gfx_circle(cx, cy, r - 1, c);
     gfx_fillCircle(cx, cy, r - 2 - r / 4, FELT);
     gfx_circle(cx, cy, r - 2 - r / 4, INK);
-}
-
-// GOBBLE: a chip seen from above, by size.
-static void piece(int cx, int cy, uint8_t lvl, uint8_t owner, bool hot) {
-    int r = 4 + lvl * 3;
-    gfx_fillCircle(cx, cy, r, INK);
-    gfx_fillCircle(cx, cy, r - 1, owner == 1 ? RED : BLUE);
-    if (lvl) gfx_circle(cx, cy, r - 3, hot ? FX_B : WHITE);
-    gfx_fillRect(cx - 1, cy - 1, 2, 2, hot ? FX_B : WHITE);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +168,8 @@ static void drawMarks(const Match &m) {
         }
         bool hot = i == fading;
         if (!(b.flags & F_ULTIMATE)) for (uint8_t j = 0; j < 5; j++) if (b.win[j] == i) hot = true;
-        if (b.flags & F_GOBBLE) piece(cx, cy, levelOf(c), topOf(c), hot || i == b.last);
+        if (b.flags & F_GOBBLE)
+            iso::stand(iso::chipArt(false, levelOf(c)), cx, cy + 3, 0, topOf(c) == 2 ? (hot ? RM_BLUEHOT : RM_BLUE) : (hot ? RM_HOT : RM_ID), false);
         else mark(cx, cy, r, topOf(c), hot ? FX_A : 0);
     }
     if (b.flags & F_ULTIMATE) {
@@ -179,11 +192,16 @@ static void drawStrike(const Board &b) {
     int ax, ay, bx, by;
     cellPos(b, b.win[0], ax, ay);
     cellPos(b, b.win[last], bx, by);
-    int r = radius(b);
-    if (b.flags & F_ULTIMATE) r = 12;
     int dx = bx - ax, dy = by - ay;
-    int ex = dx ? (dx > 0 ? r : -r) : 0, ey = dy ? (dy > 0 ? r : -r) : 0;
-    ax -= ex; ay -= ey; bx += ex; by += ey;
+    if (isoOn(b)) {                                      // through the pieces' middles
+        int up = b.n == 9 ? 12 : 7, ex = dx / (2 * last), ey = dy / (2 * last);
+        ax -= ex; ay -= ey + up; bx += ex; by += ey - up;
+    } else {
+        int r = radius(b);
+        if (b.flags & F_ULTIMATE) r = 12;
+        int ex = dx ? (dx > 0 ? r : -r) : 0, ey = dy ? (dy > 0 ? r : -r) : 0;
+        ax -= ex; ay -= ey; bx += ex; by += ey;
+    }
     int p = strikeT > 16 ? 16 : strikeT;
     bx = ax + (bx - ax) * p / 16;
     by = ay + (by - ay) * p / 16;
@@ -195,57 +213,79 @@ static void drawStrike(const Board &b) {
 // ---------------------------------------------------------------------------
 // The side panels of the 3x3 tables
 // ---------------------------------------------------------------------------
-static void chipPile(int cx, uint8_t n, uint8_t lifted) {
+static void chipPile(int cx, int base, int pitch, uint8_t n, uint8_t lifted) {
     for (uint8_t i = 0; i < n; i++) {
         bool up = i >= n - lifted;
-        art::chip(cx, 100 - i * 3 - (up ? 5 : 0), up ? 1 : 2, i == n - 1 || i == n - lifted - 1);
+        art::chip(cx, base - i * pitch - (up ? 5 : 0), up ? 1 : 2, i == n - 1 || i == n - lifted - 1);
     }
 }
 
-static void drawSides(const Match &m) {
+// AUCTION: each side's chips, as they stand (during the show, as bid).
+static uint8_t chipsOf(const Match &m, uint8_t s, uint8_t &lift) {
+    const Board &b = m.b;
+    bool bidding = m.phase == Phase::Bid || m.phase == Phase::BidShow;
+    lift = !bidding ? 0 : (s ? (m.phase == Phase::BidShow ? m.bidC : 0) : m.bidP);
+    uint8_t n = b.chips[s];
+    if (m.phase == Phase::BidShow) {
+        uint8_t paid = b.turn ? m.bidC : m.bidP;
+        n = (uint8_t)(b.turn == s ? n + paid : n - paid);
+    }
+    return n;
+}
+
+static bool turnOf(const Match &m, uint8_t s) {
+    return !m.b.result && m.b.turn == s && m.phase >= Phase::Human && m.phase <= Phase::Settle;
+}
+
+static const char *whoName(const Match &m, uint8_t s) { return m.two ? (s ? "P2" : "P1") : (s ? "HIM" : "YOU"); }
+
+// BLITZ's clock and score: big digits under a label.
+static void bigNumber(int x, int y, const char *label, int value, uint8_t c, bool right) {
+    char buf[4];
+    *fmtInt(buf, value) = 0;
+    text35(right ? x - text35Width(label) : x, y, label, SILVER);
+    text35x2(right ? x - 2 * text35Width(buf) : x, y + 8, buf, c);
+}
+
+// The corners of the 3x3 tables (both views): who is who at the top, and at
+// the foot what each side has on the table - the stakes, the chips to bid,
+// the pieces in hand.
+static void drawSides(const Match &m, const Casino &c) {
     const Board &b = m.b;
     for (uint8_t s = 0; s < 2; s++) {
-        int cx = s ? 117 : 10;
-        bool turn = !b.result && b.turn == s && m.phase >= Phase::Human && m.phase <= Phase::Settle;
-        const char *who = m.two ? (s ? "P2" : "P1") : (s ? "HIM" : "YOU");
-        text35(cx - 5, 17, who, turn ? FX_B : SILVER);
-        if (!(b.flags & (F_WILD | F_GOBBLE))) mark(cx, 30, 4, (uint8_t)((b.flags & F_SAME) ? 1 : s + 1));
-        if (b.flags & F_GOBBLE) {
+        int x = s ? 124 : 4, dir = s ? -1 : 1;
+        const char *who = whoName(m, s);
+        text35(s ? x - text35Width(who) : x, 15, who, turnOf(m, s) ? FX_B : SILVER);
+        uint8_t sym = (b.flags & F_SAME) ? 1 : (uint8_t)(s + 1);
+        if (b.flags & F_GOBBLE) iso::stand(iso::chipArt(false, 1), x + dir * 9, 34, 0, s ? RM_BLUE : RM_ID, false);
+        else if (!(b.flags & F_WILD)) iso::stand(iso::art(false, sym), x + dir * 9, 39, 0, RM_ID, false);
+        if (b.flags & F_GOBBLE) {                        // the chips still in hand, small to large
+            static const int8_t AT[3] = {5, 18, 35};
             for (uint8_t l = 0; l < 3; l++) {
-                int y = 34 + l * 22;
-                if (!b.stock[s][l]) continue;
-                if (s == b.turn && l == m.size && m.phase == Phase::Human) gfx_rect(s ? 107 : 0, y - 11, 21, 23, FX_B);
-                piece(cx, y, l, (uint8_t)(s + 1), false);
-                if (b.stock[s][l] > 1) text35(cx + 5, y + 6, "2", WHITE);
+                int cx = x + dir * AT[l];
+                if (s == b.turn && l == m.size && m.phase == Phase::Human && (!s || m.two))
+                    gfx_fillRect(cx - 4 - l, 115, 9 + 2 * l, 1, FX_B);
+                for (uint8_t k = 0; k < b.stock[s][l]; k++)
+                    iso::stand(iso::chipArt(false, l), cx, 112 - 3 * k, 0, s ? RM_BLUE : RM_ID, !k);
             }
-        }
-        if (b.flags & F_AUCTION) {
-            bool bidding = m.phase == Phase::Bid || m.phase == Phase::BidShow;
-            uint8_t lift = !bidding ? 0 : (s ? (m.phase == Phase::BidShow ? m.bidC : 0) : m.bidP);
-            // During the show the chips have already changed hands: draw them as bid.
-            uint8_t n = b.chips[s];
-            if (m.phase == Phase::BidShow) {
-                uint8_t paid = b.turn ? m.bidC : m.bidP;
-                n = (uint8_t)(b.turn == s ? n + paid : n - paid);
-            }
-            chipPile(cx, n, lift);
+        } else if (b.flags & F_AUCTION) {
+            uint8_t lift, n = chipsOf(m, s, lift);
+            chipPile(x + dir * 7, 110, 2, n, lift);
             char buf[4];
             *fmtInt(buf, n) = 0;
-            text35(cx - text35Width(buf) / 2, 108, buf, WHITE);
+            text35(x + dir * 16 - (s ? text35Width(buf) : 0), 108, buf, WHITE);
+        } else if (!(b.flags & F_BLITZ) && !m.two) {    // the stakes: yours, and what the house puts up
+            const ModeDef &d = MODES[m.mode];
+            int32_t ante = ANTES[c.ante];
+            art::chipStack(x + dir * 12, 110, s ? ante * d.payNum / d.payDen * (m.level + 1) : ante, 6);
         }
     }
     if (b.flags & F_BLITZ) {
-        char buf[4];
-        *fmtInt(buf, m.wins) = 0;
-        text35(111, 50, "WON", SILVER);
-        text35x2(117 - text35Width(buf), 60, buf, GOLD);
-        text35(3, 50, "TIME", SILVER);
-        *fmtInt(buf, (m.clock + 59) / 60) = 0;
-        text35x2(10 - text35Width(buf), 60, buf, m.clock < 600 ? RED : WHITE);
+        bigNumber(4, 92, "TIME", (m.clock + 59) / 60, m.clock < 600 ? RED : WHITE, false);
+        bigNumber(124, 92, "WON", m.wins, GOLD, true);
         if (m.phase == Phase::Human) {                   // the shot clock, draining
-            gfx_rect(7, 78, 6, 28, SILVER);
-            int h = 26 * m.shot / SHOT_TICKS;
-            gfx_fillRect(8, 79 + 26 - h, 4, h, m.shot < 60 ? RED : FX_B);
+            int w = 26 * m.shot / SHOT_TICKS;
+            gfx_fillRect(4, 112, w, 2, m.shot < 60 ? RED : FX_B);
         }
     }
 }
@@ -267,6 +307,7 @@ static const char *status(const Match &m) {
             if (b.flags & F_MISERE) return "DON'T MAKE THREE";
             if (b.flags & F_DARK) return "FEEL YOUR WAY";
             if (m.two) return b.turn ? "PLAYER 2" : "PLAYER 1";
+            if (canIso(b) && b.left == b.n) return "YOUR MOVE   SELECT: VIEW";
             return "YOUR MOVE";
         case Phase::Think: case Phase::Reach: return quipT ? quip : "THE DEALER THINKS";
         default: return quipT ? quip : "";
@@ -296,29 +337,36 @@ static void drawBars(const Match &m, const Casino &c) {
 // ---------------------------------------------------------------------------
 // Events
 // ---------------------------------------------------------------------------
-static void say(const char *s) { quip = s; quipT = 110; }
+__attribute__((noinline)) static void say(const char *s) { quip = s; quipT = 110; }
 
-static void tip(const Board &b, uint8_t cell, int16_t &x, int16_t &y) {
+static const uint8_t *heldArt(const Match &m, uint8_t side, const uint8_t *&rm);
+
+__attribute__((noinline)) static void tip(const Match &m, uint8_t cell, uint8_t side, int16_t &x, int16_t &y) {
+    const Board &b = m.b;
     int cx, cy;
     cellPos(b, cell, cx, cy);
     x = (int16_t)(cx << 4);
-    y = (int16_t)((cy - radius(b) / 2) << 4);
+    const uint8_t *rm, *a = heldArt(m, side, rm);
+    if (a) cy -= HOLD + iso::height(a) - 3;              // pinching the top of the piece it holds
+    y = (int16_t)((cy - (isoOn(b) ? 1 : radius(b) / 2)) << 4);
 }
 
 void reset(const Match &m) {
     (void)m;
     gloveOn = moving = reaching = false;
+    bandLo = 12; bandHi = 116;
     alertT = busyT = strikeT = tossT = quipT = 0;
     catT = 0;
+    dropT = 0; dropCell = NONE;
     lastPhase = 0xFF;
     lastSig = 0;
     dirty = true;
     fx::clear();
 }
 
-void invalidate() { dirty = true; }
+void invalidate() { dirty = true; bandLo = 12; bandHi = 116; }
 
-bool busy() { return busyT || tossT || (reaching && moving); }
+bool busy() { return busyT || tossT || introT || dropT || (reaching && moving); }
 
 void paid(int32_t net) {
     char buf[10], *p = buf;
@@ -332,10 +380,13 @@ void onEvents(const Match &m) {
     for (uint8_t i = 0; i < m.nEv; i++) {
         const Event &e = m.ev[i];
         int cx = 64, cy = 64;
-        dirty = true;
+        if (e.type == EV_MOVE) moved = true;
+        else dirty = true;
         switch (e.type) {
             case EV_START:
                 strikeT = 0;
+                dropT = 0; dropCell = NONE;
+                if (isoOn(b)) introT = 18;
                 break;
             case EV_TOSS:
                 tossT = 1; tossWho = e.a;
@@ -375,20 +426,21 @@ void onEvents(const Match &m) {
                     audio::sfx(Sfx::Tock);
                     break;
                 }
-                cellPos(b, e.a, cx, cy);
-                fx::burst(fx::DUST, cx, cy, 6, 24, e.b ? CYAN : SKIN);
                 uint8_t need = (uint8_t)(b.k - b.run);
-                if (b.result && b.win[0] != NONE) fx::floatText("TOE!", cx, cy - 8, FX_A);
-                else if (need == 1) { fx::floatText("TAC", cx, cy - 8, WHITE); audio::sfx(Sfx::Tac); }
-                else if (need == 2 && b.n == 9) { fx::floatText("TIC", cx, cy - 8, WHITE); audio::sfx(Sfx::Tic); }
-                else audio::sfx(Sfx::Place);
+                landText = nullptr; landColour = WHITE; landSfx = Sfx::Place;
+                if (b.result && b.win[0] != NONE) { landText = "TOE!"; landColour = FX_A; }
+                else if (need == 1) { landText = "TAC"; landSfx = Sfx::Tac; }
+                else if (need == 2 && b.n == 9) { landText = "TIC"; landSfx = Sfx::Tic; }
+                dropCell = e.a;
+                if (isoOn(b)) { dropT = 12; busyT = 14; gloveOn = false; break; }
+                dropT = 1;                                    // the map: it lands at once
                 if (!e.b && !b.result && !m.two) {       // the dealer has opinions
                     uint32_t r = fx::rnd();
                     if (b.n == 9 && b.left == 8 && !(b.flags & F_BLITZ))
                         say(QUIPS[e.a == 4 ? QUIP_CENTRE : ((e.a & 1) ? QUIP_EDGE : QUIP_CORNER)]);
                     else if (r % 7 == 0 && !(b.flags & F_BLITZ)) say(QUIPS[QUIP_ANY + (r >> 8) % QUIP_ANY_N]);
                 }
-                busyT = 6;
+                if (dropT == 1) busyT = 6;
                 break;
             }
             case EV_GONE:
@@ -432,9 +484,29 @@ void onEvents(const Match &m) {
     }
 }
 
+// A piece meets the felt: dust, its call-out and its sound.
+__attribute__((noinline)) static void land(const Board &b) {
+    int cx, cy;
+    cellPos(b, dropCell, cx, cy);
+    bool big = !isoOn(b) || b.n == 9;
+    fx::burst(fx::DUST, cx, cy, big ? 8 : 5, big ? 30 : 20, isoOn(b) ? FELT_LT : SKIN);
+    if (landText) fx::floatText(landText, cx, cy - (isoOn(b) ? (big ? 30 : 20) : 8), landColour);
+    if (isoOn(b) && big) fx::shake(3, 1);
+    audio::sfx(landSfx);
+}
+
 void update(const Match &m) {
     const Board &b = m.b;
     fx::update();
+    if (introT && !--introT) {                           // the board lands: thump
+        fx::shake(6, 2);
+        fx::burst(fx::DUST, 6, 70, 6, 20, SILVER);
+        fx::burst(fx::DUST, 122, 70, 6, 20, SILVER);
+        fx::burst(fx::DUST, 64, 104, 8, 24, SILVER);
+        audio::sfx(Sfx::Place);
+    }
+    if (dropT && --dropT == (isoOn(b) ? 7 : 0) && dropCell != NONE) land(b);
+    if (!dropT) dropCell = NONE;
     if (busyT) busyT--;
     if (alertT) alertT--;
     if (quipT && !--quipT) dirty = true;
@@ -453,7 +525,7 @@ void update(const Match &m) {
         bool second = b.turn != 0;                       // two players: the red cuff
         if (gloveCpu != second) was = false;
         gloveOn = true; gloveCpu = second;
-        tip(b, m.cur, tx, ty);
+        tip(m, m.cur, b.turn, tx, ty);
         if (!was) { gx = tx; gy = ty; }
     } else if (p == Phase::Think) {
         if (!gloveOn || !gloveCpu) { gx = HOME_X; gy = HOME_Y; }
@@ -461,41 +533,146 @@ void update(const Match &m) {
         tx = HOME_X; ty = HOME_Y;
     } else if (p == Phase::Reach && !(b.flags & F_DARK)) {   // in the dark his hand isn't seen
         gloveOn = gloveCpu = true;
-        tip(b, m.pend.cell, tx, ty);
+        tip(m, m.pend.cell, 1, tx, ty);
     } else if (p != Phase::Settle) gloveOn = false;
     int dx = tx - gx, dy = ty - gy;
     moving = dx > 12 || dx < -12 || dy > 12 || dy < -12;
     if (moving) { gx = (int16_t)(gx + dx / 3); gy = (int16_t)(gy + dy / 3); }
     else { gx = tx; gy = ty; }
 
-    uint32_t sig = (uint32_t)p | ((uint32_t)m.cur << 4) | ((uint32_t)m.size << 12) | ((uint32_t)m.bidP << 16) |
-                   ((uint32_t)gloveOn << 24);
+    uint32_t sig = (uint32_t)p | ((uint32_t)m.size << 12) | ((uint32_t)m.bidP << 16) | ((uint32_t)gloveOn << 24);
     if (sig != lastSig) { lastSig = sig; dirty = true; }
 }
 
 // ---------------------------------------------------------------------------
+// The iso table
+// ---------------------------------------------------------------------------
+// The piece a glove carries in iso (null: none) and its colours.
+__attribute__((noinline)) static const uint8_t *heldArt(const Match &m, uint8_t side, const uint8_t *&rm) {
+    const Board &b = m.b;
+    rm = RM_ID;
+    if (!isoOn(b) || (b.flags & F_WILD) || b.result) return nullptr;
+    bool big = b.n == 9;
+    if (b.flags & F_GOBBLE) {
+        uint8_t l = side == 0 || m.two ? m.size : m.pend.arg;
+        if (side) rm = RM_BLUE;
+        return iso::chipArt(big, l);
+    }
+    return iso::art(big, (b.flags & F_SAME) ? 1 : (uint8_t)(side + 1));
+}
+
+static bool inLine(const Board &b, uint8_t cell) {
+    for (uint8_t j = 0; j < 5; j++) if (b.win[j] == cell) return true;
+    return false;
+}
+
+static void drawIso(const Match &m, const Casino &c, uint32_t frame) {
+    const Board &b = m.b;
+    iso::View v = iso::view(b, introLift());
+    iso::drawRoom();
+    drawSides(m, c);
+    iso::drawBoard(v);
+    if (m.phase == Phase::Human) iso::padBorder(v, m.cur, b.n == 9 ? 3 : 2, FX_B, FX_B, 0);
+    else if (!b.result && b.last != NONE && b.turn == 0 && !m.two && !(b.flags & F_DARK) && !dropT)
+        iso::padBorder(v, b.last, b.n == 9 ? 3 : 2, SILVER, FELT_DK, 0);   // where the dealer just went
+    uint8_t fading = NONE;
+    if ((b.flags & F_VANISH) && !b.result && b.qn[b.turn] == 3) fading = b.q[b.turn][0];
+    bool hop = b.result && fx::bannerActive();
+    // Back to front: the far corner's diagonal first.
+    for (int s = 0; s <= 2 * (v.n - 1); s++) {
+        for (int u = 0; u < v.n; u++) {
+            int w = s - u;
+            if (w < 0 || w >= v.n) continue;
+            uint8_t cell = (uint8_t)(w * v.n + u), cv = b.cell[cell];
+            if (!cv) continue;
+            uint8_t sym = topOf(cv);
+            if ((b.flags & F_DARK) && sym == 2 && !(b.seen >> cell & 1)) continue;   // not found yet
+            int cx, cy;
+            iso::cellPos(v, cell, cx, cy);
+            if (sym == 3) {                              // MINES: a scorched hole in the felt
+                gfx_fillEllipse(cx, cy, v.hh, v.hh / 2, INK);
+                gfx_ellipse(cx, cy, v.hh, v.hh / 2, WINE);
+                gfx_hline(cx - 2, cy - 1, 4, WOOD);
+                continue;
+            }
+            bool hot = cell == fading || inLine(b, cell);
+            int lift = 0;
+            if (cell == dropCell && dropT) lift = (HOLD * (256 - fx::ease(fx::OUT_BOUNCE, 12 - dropT, 12))) >> 8;
+            else if (hop && inLine(b, cell)) {
+                int a = fx::isin((int)(frame * 12) - cx * 2);
+                if (a > 0) lift = (a * (v.big ? 6 : 4)) >> 8;
+            }
+            const uint8_t *rm = hot ? RM_HOT : RM_ID;
+            if (b.flags & F_GOBBLE) {
+                if (sym == 2) rm = hot ? RM_BLUEHOT : RM_BLUE;
+                iso::stand(iso::chipArt(v.big, levelOf(cv)), cx, cy, lift, rm);
+            } else iso::stand(iso::art(v.big, sym), cx, cy, lift, rm);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The rows of what moves on its own: the glove, the piece it holds, the
+// cursor's pad - and BLITZ's clocks.
+static void movingRows(const Match &m, int &lo, int &hi) {
+    const Board &b = m.b;
+    lo = 128; hi = 0;
+    if (gloveOn) {
+        const uint8_t *rm, *held = heldArt(m, m.phase == Phase::Human ? b.turn : 1, rm);
+        lo = (gy >> 4) - 16;
+        hi = (gy >> 4) + (held ? iso::height(held) + 2 : 2);
+    }
+    if (m.phase == Phase::Human || m.phase == Phase::Reach) {   // its pad (and the held piece's shadow)
+        int cx, cy, h = b.n == 9 ? 10 : 6;
+        cellPos(b, m.phase == Phase::Human ? m.cur : m.pend.cell, cx, cy);
+        if (cy - h < lo) lo = cy - h;
+        if (cy + h > hi) hi = cy + h;
+    }
+    if (b.flags & F_BLITZ) { if (lo > 90) lo = 90; hi = 116; }
+}
+
 bool render(const Match &m, const Casino &c, uint32_t frame) {
     const Board &b = m.b;
     int lo, hi;
-    bool live = dirty || busyT || tossT || catT || alertT || moving || (strikeT && strikeT < 17) ||
-                fx::activeRows(lo, hi) || fx::bannerActive() ||
-                ((b.flags & F_BLITZ) && m.phase != Phase::Over);
-    if (!live) return false;
-    dirty = moving;                                      // one more frame once it lands
+    uint16_t clk = (b.flags & F_BLITZ) && m.phase != Phase::Over ? (uint16_t)((m.clock + 59) / 60 * 64 + m.shot * 26 / SHOT_TICKS) : 0;
+    bool full = dirty || busyT || tossT || catT || alertT || (strikeT && strikeT < 17) || introT || dropT ||
+                fx::activeRows(lo, hi) || fx::bannerActive();
+    bool motion = moving || wasMoving || moved || clk != clockSig;
+    wasMoving = moving;
+    if (!full && !motion) return false;
+    dirty = moved = false;
+    clockSig = clk;
+    // In iso a full redraw costs most of a frame; when only the glove or the
+    // cursor moved, just the rows they were and are in are drawn again.
+    int nlo, nhi;
+    movingRows(m, nlo, nhi);
+    bool band = !full && isoOn(b);
+    if (band) {
+        lo = nlo < bandLo ? nlo : bandLo;
+        hi = nhi > bandHi ? nhi : bandHi;
+        if (lo < 12) lo = 12;
+        if (hi > 116) hi = 116;
+        if (lo < hi) drawRows(lo, hi);
+    }
+    bandLo = (int16_t)nlo; bandHi = (int16_t)nhi;
 
-    gfx_fillRect(0, BOARD_Y0, 128, BOARD_Y1 - BOARD_Y0, FELT);
-    if (b.d > 1) drawTower(); else drawGrid(b);
-    drawMarks(m);
-    if (b.n == 9) drawSides(m);
+    if (isoOn(b)) drawIso(m, c, frame);
+    else {
+        gfx_fillRect(0, BOARD_Y0, 128, BOARD_Y1 - BOARD_Y0, FELT);
+        if (b.d > 1) drawTower(); else drawGrid(b);
+        drawMarks(m);
+        if (b.n == 9) drawSides(m, c);
+    }
     drawStrike(b);
 
-    if (!b.result && b.last != NONE && b.turn == 0 && !m.two && b.n > 9 && !(b.flags & F_DARK)) {
+    if (isoOn(b)) {
+    } else if (!b.result && b.last != NONE && b.turn == 0 && !m.two && b.n > 9 && !(b.flags & F_DARK)) {
         int cx, cy;                                      // where the dealer just went
         cellPos(b, b.last, cx, cy);
         int h = b.d > 1 ? 3 : (geo(b).cw - 1) / 2 - 1;
         gfx_rect(cx - (b.d > 1 ? 7 : h), cy - h, 2 * (b.d > 1 ? 7 : h) + 1, 2 * h + 1, SILVER);
     }
-    if (m.phase == Phase::Human) {                       // the cursor's cell
+    if (m.phase == Phase::Human && !isoOn(b)) {         // the cursor's cell
         int cx, cy;
         uint8_t at = m.cur;
         if ((b.flags & F_GRAVITY) && rules::drop(b, at) != NONE) at = rules::drop(b, at);   // where it will land
@@ -514,8 +691,19 @@ bool render(const Match &m, const Casino &c, uint32_t frame) {
         gfx_ellipse(64, cy, 9, ry, WOOD);
         if (tossT > 36) mark(64, cy, 4, (uint8_t)(tossWho + 1), tossWho ? BLUE : RED);
     }
-    if (catT) sprite4((catT & 8) ? CAT1 : CAT2, (int)catT - 18, 104, RM_ID);
+    if (catT) sprite4((catT & 8) ? CAT1 : CAT2, (int)catT - 18, isoOn(b) ? 105 : 104, RM_ID);
     fx::drawParticles(2);
+    const uint8_t *hrm, *held = gloveOn && (m.phase == Phase::Human || m.phase == Phase::Think || m.phase == Phase::Reach)
+                                        ? heldArt(m, m.phase == Phase::Human ? b.turn : 1, hrm) : nullptr;
+    if (held) {
+        int hx = gx >> 4, hy = (gy >> 4) + iso::height(held) - 2;
+        if (!moving && (m.phase == Phase::Human || m.phase == Phase::Reach)) {
+            int cx, cy;
+            cellPos(b, m.phase == Phase::Human ? m.cur : m.pend.cell, cx, cy);
+            iso::shadow(held, cx, cy, HOLD);
+        }
+        iso::stand(held, hx, hy, 0, hrm, false);
+    }
     if (gloveOn) {
         const uint8_t *rm = alertT ? RM_ALERT : (gloveCpu ? RM_CPU : RM_ID);
         sprite4(HAND, (gx >> 4) - HAND_TIP, (gy >> 4) - 15, rm);
@@ -523,6 +711,7 @@ bool render(const Match &m, const Casino &c, uint32_t frame) {
     fx::drawFloats();
     fx::drawBanner();
     fx::applyShake(BOARD_Y0, BOARD_Y1 - 1);
+    if (band) { drawRows(0, GFX_H); return true; }
     drawBars(m, c);
     (void)frame;
     return true;

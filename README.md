@@ -10,7 +10,11 @@ game gets the VIP room: seventeen tables with seventeen sets of rules, a
 stake on every game, the croupier from Blackjack's tables explaining each
 one with a straight face, "TIC", "TAC" and "TOE!" called as a line builds,
 the winning line struck through in rainbow, and a cat that walks across
-the felt whenever nobody wins.
+the felt whenever nobody wins. The 3x3 and 5x5 tables are played in
+CHChess's isometric view: a walnut board with gold-inlaid lines and felt
+pads under a spotlight, lacquered Xs and Os standing on it, each carried
+in by a glove and dropped with a bounce. SELECT flips to a flat map of the
+board.
 
 | Title | The tables | A win |
 |---|---|---|
@@ -55,11 +59,11 @@ the last two flash pages for saving. From the command line:
 
 | Button | At a table | Elsewhere |
 |---|---|---|
-| D-pad | move the glove (TOWER: up and down past a floor's edge changes floor) | menus; in the tables room left/right picks the table, up/down the stake |
+| D-pad | move the glove; on the iso tables it goes to the nearest cell that way on screen (TOWER: up and down past a floor's edge changes floor) | menus; in the tables room left/right picks the table, up/down the stake |
 | A | place your mark | select |
 | B | GOBBLE: next size; WILD: place an O | back |
-| SELECT | the table's rules | |
-| START | pause: resume, how to play, options, walk away (the stake stays) | |
+| SELECT | 3x3 and 5x5 tables: the iso table or the flat map (it stays as you leave it); other tables: the rules | |
+| START | pause: resume, how to play (the rules), options, walk away (the stake stays) | |
 
 You start with $100. Pick a table and a stake ($5 to $250), and play the
 dealer. A win pays the table's odds, a draw is a push, a loss costs the
@@ -106,15 +110,25 @@ are not offered, since they need a clock or a secret.
 
 ## How it fits
 
-- **Flash**: 43,892 B release, 45.5 KB with the debug protocol. One board
-  type (up to 99 cells, a line length, rule flags) and one line scanner
-  serve every table, so a new table is mostly a flag and a paragraph.
+- **Flash**: 50,052 B release (both save pages kept). One board type (up to
+  99 cells, a line length, rule flags) and one line scanner serve every
+  table, so a new table is mostly a flag and a paragraph. The iso view is
+  about 6 KB of it. Device debug builds (the protocol is ~1.7 KB) leave out
+  saving and the end screens' PPOT lettering (`CHTT_LEAN`).
+- **The pieces** are ray-marched from signed-distance models by
+  `tools/pieces.py` (after CHChess's) at the board's 30 degree camera, in
+  two sizes, and quantised to the palette; the PNGs in `tools/art/pieces/`
+  can be touched up by hand.
 - **The dealer**: on 3x3 tables a depth-limited search of the real rules;
   on the big felts every empty cell is scored by the lines it could still
   make or break, 12 cells a frame.
 - **Drawing**: the play screen is redrawn only on frames where something
-  moved; palette cycling animates the cursor, the fading VANISH mark and
-  the winning line with no redraw.
+  moved, and in iso, when only the glove or the cursor moved, only the band
+  of rows they swept is drawn again (a full iso frame is estimated at
+  ~7 ms, a glove move at ~5 ms; neither is measured on the device yet).
+  `tools/chsim/diffdrive.py` checks band redraws against full ones pixel
+  for pixel. Palette cycling animates the cursor, the fading VANISH mark
+  and the winning line with no redraw.
 - **Saving**: options, statistics and the run (purse, table, stake,
   streak) in the last two flash pages, every five games and on leaving.
 - **Sound**: CHBlackjack's piezo sequencer, effects only (no music).
@@ -131,14 +145,17 @@ are not offered, since they need a clock or a secret.
   `perf`, `showcase` (the GIFs above, into `docs`).
 - `python tools/device.py build|upload [--debug]`, `python tools/check_size.py build/release`.
 - `python tools/assets.py`: rebuild `src/assets` from `tools/art`.
-  `python tools/make_logo.py` redrafts the title lettering.
+  `python tools/make_logo.py` redrafts the title lettering;
+  `python tools/pieces.py` re-renders the iso pieces (overwriting the PNGs).
+- `python tools/chsim/diffdrive.py tools/scripts/diff_iso.txt out/diff 1`:
+  band redraws against full redraws (0 stale frames expected).
 - `python tools/audio/preview.py out/audio`: the effects as WAV files.
 
 ## Files
 
     CHTicTacToe.ino   setup, the frame loop, debug commands
     src/game/         Rules (every table), Cpu (the dealer), Match (turns, toss, bids, clock), Text
-    src/render/       Stage (the play screen), Table (the dealer's wall), ChipArt
+    src/render/       Stage (the play screen), Iso (the isometric tables), Table (the dealer's wall), ChipArt
     src/states/       Screens: title, tables room, play, options, stats, win, broke
     src/gfx, src/fx   palette, drawing, lettering, particles, banners
     src/audio, src/save, src/debug

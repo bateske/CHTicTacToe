@@ -8,16 +8,47 @@ perf
 say J G 0
 wait 100
 perf
+# CLASSIC in iso: idle, then moving the glove every few frames (full redraws).
 say J P 0
-wait 40
+wait 60
+perf
+tap RIGHT
+wait 3
+tap DOWN
+wait 3
+tap LEFT
+wait 3
+tap UP
+wait 3
+tap RIGHT
+wait 3
+tap DOWN
+wait 3
 perf
 tap A
 wait 100
 perf
-say J P 15
-wait 40
+# BIG 5 in iso, glove moving.
+say J P 10
+wait 60
+tap RIGHT
+wait 3
+tap DOWN
+wait 3
+tap LEFT
+wait 3
+tap UP
+wait 3
+perf
+# GOBBLE (most art on screen).
+say J P 5
+wait 60
 tap A
 wait 100
+tap RIGHT
+wait 3
+tap DOWN
+wait 3
 perf
 say J P 16
 wait 40
@@ -28,22 +59,6 @@ say J P 14
 wait 40
 tap A
 wait 100
-perf
-say J P 13
-wait 40
-tap A
-wait 100
-perf
-say D 0
-say J P 0
-wait 60
-say C 0
-wait 100
-say C 4
-wait 100
-say C 8
-perf
-wait 120
 perf
 say J W
 wait 100

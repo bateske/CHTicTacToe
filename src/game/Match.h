@@ -72,6 +72,7 @@ struct Match {
     uint8_t wins, boards;           // BLITZ
     uint8_t result;                 // the game's Result
     bool two;                       // two players, turn about on the one handheld
+    bool iso;                       // the board is seen in iso: the D-pad goes by screen direction
     uint8_t score[2];               // two players: games won (start() leaves it alone)
     uint32_t rng;
     Event ev[6];
@@ -92,4 +93,5 @@ private:
     void finish();
     void human(uint8_t pressed, uint8_t rep);
     void nudge(uint8_t rep);
+    void nudgeIso(uint8_t rep);
 };

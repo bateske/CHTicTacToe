@@ -20,9 +20,15 @@
 #endif
 #endif
 
-// Device debug builds would drop things to fit (CHTT_LEAN); this game fits
-// whole (45.5 KB with the protocol), so nothing is dropped.
+// Device debug builds carry the protocol (~1.7 KB) and so leave out what
+// the tests never need: the end screens' PPOT lettering (plain lettering
+// instead) and saving. -DCHTT_FULL keeps them (it does not fit). The
+// simulator and release builds keep everything.
+#if CHTT_DEBUG && !defined(CHSIM) && !defined(CHTT_FULL)
+#define CHTT_LEAN        1
+#else
 #define CHTT_LEAN        0
+#endif
 
 // Section profiler (dbg::prof + the T command). Opt-in: costs flash.
 #ifndef CHTT_PROFILE

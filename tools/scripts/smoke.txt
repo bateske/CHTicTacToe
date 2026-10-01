@@ -177,4 +177,34 @@ snap 29_two_gobble
 say J T
 wait 100
 snap 30_title
+# The strategy map of the iso tables.
+say J P 5
+wait 50
+tap A
+wait 100
+tap SELECT
+wait 10
+snap 31_gobble_map
+say J P 9
+wait 50
+tap UP
+tap UP
+tap A
+wait 20
+tap SELECT
+wait 10
+snap 32_auction_map
+say J P 1
+wait 50
+tap SELECT
+wait 10
+snap 33_blitz_map
+say J P 10
+wait 50
+tap A
+wait 100
+snap 34_big5_map
+tap SELECT
+wait 10
+snap 35_big5_iso
 perf
