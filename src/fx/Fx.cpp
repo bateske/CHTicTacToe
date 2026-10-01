@@ -134,12 +134,8 @@ void drawBanner() {
     for (int r = 0; r < h + 5 && r < 32; r++) {
         switch (bannerStyle) {
             case B_RAINBOW: ramp[r] = RAIN[((r / 2) + t / 3) % 5]; break;
-            case B_GOLD:    ramp[r] = r < 3 ? FX_B : (r < h / 2 + 6 ? GOLD : WOOD); break;
             case B_RED:     ramp[r] = r < 3 ? WHITE : RED; break;
-            case B_CYAN:    ramp[r] = r < 3 ? WHITE : CYAN; break;
-            case B_BLACK:   ramp[r] = r < 3 ? WHITE : (r < h / 2 + 3 ? SILVER : NAVY); break;
-            case B_GREEN:   ramp[r] = r < 3 ? WHITE : (r < h / 2 + 6 ? FELT_LT : FELT); break;
-            default:        ramp[r] = WHITE; break;
+            default:        ramp[r] = r < 3 ? WHITE : CYAN; break;      // B_CYAN (the only other one used)
         }
     }
     uint8_t outline = bannerStyle == B_RAINBOW ? FX_A : INK;

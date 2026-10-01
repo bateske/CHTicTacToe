@@ -50,8 +50,8 @@ static void slope(int x, int y, int rows, int dir, uint8_t c) {
     for (int k = 0; k < rows; k++) gfx_hline(dir > 0 ? x + 2 * k : x - 2 * k - 1, y + k, 2, c);
 }
 
-void drawRoom() {
-    gfx_fillRect(0, ROOM_Y0, 128, ROOM_Y1 - ROOM_Y0, NAVY);
+void drawRoom(uint8_t base, uint8_t pool) {
+    gfx_fillRect(0, ROOM_Y0, 128, ROOM_Y1 - ROOM_Y0, base);
     // The spotlight's pool on the carpet: an ellipse of dithered blue. Its
     // half widths are worked out once.
     static uint8_t half[ROOM_Y1 - ROOM_Y0];
@@ -66,7 +66,7 @@ void drawRoom() {
     }
     for (int y = ROOM_Y0; y < ROOM_Y1; y++) {
         int w = half[y - ROOM_Y0];
-        if (w) dither(64 - w, y, 2 * w, 1, BLUE, 0);
+        if (w) dither(64 - w, y, 2 * w, 1, pool, 0);
     }
 }
 

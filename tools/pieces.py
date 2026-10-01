@@ -120,6 +120,10 @@ PIECES = {
     "chip2": (lambda: chip(12.5, 6.0), "red"),
 }
 SIZES = {"L": 1.0, "S": 0.62}
+# The X and O are rendered 2 px smaller each way than their natural size at
+# SIZES (the user's call: they sit inside their tiles, and a piece held over
+# one reads as above it).
+SHRINK = {"x": 2, "o": 2}
 WHICH = {"L": ["x", "o", "chip0", "chip1", "chip2"], "S": ["x", "o", "chip0", "chip1", "chip2"]}
 
 
@@ -239,6 +243,12 @@ def main():
             fn, tones = PIECES[name]
             shape, gold, height = fn()
             img, anchor = render(shape, gold, height, tones, SIZES[sz])
+            if name in SHRINK:
+                w0, h0 = img.shape[1], img.shape[0]
+                k = 1.0
+                while img.shape[1] > w0 - SHRINK[name] or img.shape[0] > h0 - SHRINK[name]:
+                    k -= 0.01
+                    img, anchor = render(shape, gold, height, tones, SIZES[sz] * k)
             stem = f"{name}_{sz.lower()}"
             to_png(img).save(OUT / f"{stem}.png")
             (OUT / f"{stem}.anchor").write_text(f"{anchor[0]} {anchor[1]}\n")

@@ -23,7 +23,7 @@ bool fits(const Board &b);          // a table drawn this way
 View view(const Board &b, int lift = 0);
 void cellPos(const View &v, uint8_t cell, int &cx, int &cy);   // the pad's centre
 
-void drawRoom();                                // the carpet under its spotlight
+void drawRoom(uint8_t base, uint8_t pool);      // the carpet (or felt) under its spotlight
 void drawBoard(const View &v);                  // slab, inlay, pads
 // A pad's outline, dashed in c/c2 (marching with phase), inset from its edge.
 void padBorder(const View &v, uint8_t cell, uint8_t inset, uint8_t c, uint8_t c2, uint8_t phase);

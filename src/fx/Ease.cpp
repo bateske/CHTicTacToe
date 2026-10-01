@@ -4,23 +4,17 @@
 namespace fx {
 
 // ---------------------------------------------------------------------------
-// Curves: 17-point Q8 tables, linearly interpolated.
+// The bounce (a piece dropping onto the felt): a 17-point Q8 table, linearly
+// interpolated. The other curves CHRoulette had are unused here.
 // ---------------------------------------------------------------------------
-static const int16_t CURVES[5][17] = {
-    {0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256},
-    {0, 45, 84, 119, 148, 173, 194, 210, 224, 235, 242, 248, 252, 254, 256, 256, 256},
-    {0, 69, 126, 173, 209, 237, 257, 271, 278, 281, 281, 277, 272, 267, 261, 258, 256},
-    {0, 3, 11, 24, 40, 59, 81, 104, 128, 152, 175, 197, 216, 232, 245, 253, 256},
-    {0, 8, 30, 68, 121, 189, 248, 215, 196, 193, 204, 231, 249, 240, 246, 253, 256},
-};
+static const int16_t BOUNCE[17] = {0, 8, 30, 68, 121, 189, 248, 215, 196, 193, 204, 231, 249, 240, 246, 253, 256};
 
-int ease(Ease e, int t, int n) {
+int bounce(int t, int n) {
     if (n <= 0 || t >= n) return 256;
     if (t <= 0) return 0;
     int p = (t << 8) / n;                    // 0..255
     int i = p >> 4, f = p & 15;
-    const int16_t *c = CURVES[e];
-    return c[i] + (((c[i + 1] - c[i]) * f) >> 4);
+    return BOUNCE[i] + (((BOUNCE[i + 1] - BOUNCE[i]) * f) >> 4);
 }
 
 static const uint8_t SIN[65] = {

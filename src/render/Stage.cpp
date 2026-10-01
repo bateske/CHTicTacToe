@@ -18,6 +18,7 @@ namespace stage {
 static const int BOARD_Y0 = 12, BOARD_Y1 = 116;         // between the two bars
 static const int HOME_X = 116 << 4, HOME_Y = 56 << 4;   // where the dealer's glove waits
 static const int HOLD = 14;             // iso: how high a glove holds its piece over the felt
+static uint8_t hover = HOLD, dropFrom = HOLD;   // over a piece: higher, clear of it
 
 static int16_t gx, gy, tx, ty;          // the glove's fingertip, Q4
 static bool gloveOn, gloveCpu, moving, reaching, dirty;
@@ -55,7 +56,11 @@ __attribute__((noinline)) bool canIso(const Board &b) { return iso::fits(b); }
 __attribute__((noinline)) bool isoOn(const Board &b) { return iso::fits(b) && !mapView; }
 void toggleView() { mapView = !mapView; dirty = true; bandLo = 12; bandHi = 116; }
 
-static int introLift() { return introT * introT / 5; }
+// iso: the board is lowered (camY px, gliding to camT) when a held piece
+// would otherwise rise out of the top of the room.
+static int8_t camY, camT;
+
+static int introLift() { return introT * introT / 5 - camY; }
 
 __attribute__((noinline)) static void cellPos(const Board &b, uint8_t cell, int &cx, int &cy) {
     if (isoOn(b)) { iso::cellPos(iso::view(b, introLift()), cell, cx, cy); return; }
@@ -118,32 +123,54 @@ void mark(int cx, int cy, int r, uint8_t sym, uint8_t colour) {
 static void drawTower() {
     for (int z = 0; z < 4; z++) {
         int ly = 15 + (3 - z) * 25;
-        for (int yy = 0; yy <= 24; yy++) gfx_hline(40 - yy * 2 / 3, ly + yy, 65, FELT_DK);
-        for (int r = 0; r <= 4; r++) gfx_hline(40 - 4 * r, ly + r * 6, 65, FELT_LT);
-        for (int c = 0; c <= 4; c++) gfx_line(40 + c * 16, ly, 24 + c * 16, ly + 24, FELT_LT);
+        // A felt floor on a wooden plate: its front edge, then the floor,
+        // lit along the back, then its lines.
+        gfx_fillRect(24, ly + 25, 65, 2, WOOD);
+        gfx_hline(24, ly + 27, 65, WINE);
+        for (int yy = 0; yy <= 24; yy++) gfx_hline(40 - yy * 2 / 3, ly + yy, 65, yy < 2 ? FELT_LT : FELT);
+        for (int r = 0; r <= 4; r++) gfx_hline(40 - 4 * r, ly + r * 6, 65, (r == 0 || r == 4) ? GOLD : FELT_DK);
+        for (int c = 0; c <= 4; c++) gfx_line(40 + c * 16, ly, 24 + c * 16, ly + 24, (c == 0 || c == 4) ? GOLD : FELT_DK);
         char f[3] = {(char)('1' + z), 'F', 0};
         text35(8, ly + 10, f, GOLD);
     }
 }
 
+// The flat map: the iso table's board seen from above - a wooden frame with
+// gold trim and its shadow on the felt, felt pads set into the wood (in
+// shadow along the top and left, catching the light bottom and right), and
+// gold inlay between the pads of the smaller boards.
 static void drawGrid(const Board &b) {
     Geo g = geo(b);
-    bool u = (b.flags & F_ULTIMATE) != 0, big = b.n == 9;
+    bool u = (b.flags & F_ULTIMATE) != 0;
     int W = b.w * g.cw + (u ? 2 : 0) - 1, H = b.h * g.cw + (u ? 2 : 0) - 1;
-    if (!big) {
-        gfx_fillRect(g.x0 - 1, g.y0 - 1, W + 2, H + 2, FELT);
-        gfx_rect(g.x0 - 2, g.y0 - 2, W + 4, H + 4, GOLD);
-    }
+    int inset = g.cw >= 24 ? 2 : (g.cw >= 14 ? 1 : 0);
+    bool inlay = g.cw >= 14;
+    dither(g.x0, g.y0 + H + 3, W + 5, 3, INK, 0);
+    dither(g.x0 + W + 3, g.y0, 3, H + 3, INK, 0);
+    gfx_fillRect(g.x0 - 3, g.y0 - 3, W + 6, H + 6, WOOD);
+    gfx_rect(g.x0 - 3, g.y0 - 3, W + 6, H + 6, GOLD);
+    gfx_hline(g.x0 - 2, g.y0 + H + 1, W + 4, WINE);
+    gfx_vline(g.x0 + W + 1, g.y0 - 2, H + 4, WINE);
+    int s = g.cw - 1 - 2 * inset;
+    for (int y = 0; y < b.h; y++)
+        for (int x = 0; x < b.w; x++) {
+            int px = g.x0 + x * g.cw + (u ? x / 3 : 0) + inset, py = g.y0 + y * g.cw + (u ? y / 3 : 0) + inset;
+            gfx_fillRect(px, py, s, s, FELT);
+            gfx_hline(px, py, s, FELT_DK);
+            gfx_vline(px, py, s, FELT_DK);
+            gfx_hline(px + 1, py + s - 1, s - 1, FELT_LT);
+            gfx_vline(px + s - 1, py + 1, s - 1, FELT_LT);
+        }
     for (int i = 1; i < b.w; i++) {
         int x = g.x0 + i * g.cw + (u ? i / 3 : 0) - 1;
-        bool heavy = big || (u && i % 3 == 0);
-        gfx_vline(x, g.y0, H, heavy ? GOLD : FELT_DK);
+        bool heavy = u && i % 3 == 0;
+        if (inlay || heavy) gfx_vline(x, g.y0, H, GOLD);
         if (heavy) gfx_vline(x - 1, g.y0, H, GOLD);
     }
     for (int i = 1; i < b.h; i++) {
         int y = g.y0 + i * g.cw + (u ? i / 3 : 0) - 1;
-        bool heavy = big || (u && i % 3 == 0);
-        gfx_hline(g.x0, y, W, heavy ? GOLD : FELT_DK);
+        bool heavy = u && i % 3 == 0;
+        if (inlay || heavy) gfx_hline(g.x0, y, W, GOLD);
         if (heavy) gfx_hline(g.x0, y - 1, W, GOLD);
     }
 }
@@ -347,7 +374,21 @@ __attribute__((noinline)) static void tip(const Match &m, uint8_t cell, uint8_t 
     cellPos(b, cell, cx, cy);
     x = (int16_t)(cx << 4);
     const uint8_t *rm, *a = heldArt(m, side, rm);
-    if (a) cy -= HOLD + iso::height(a) - 3;              // pinching the top of the piece it holds
+    // Over a piece that's showing, the held one rises clear of its top, so it
+    // reads as above it rather than through it.
+    uint8_t on = b.cell[cell], sym = topOf(on);
+    int lift = HOLD;
+    if (a && on && sym != 3 && !((b.flags & F_DARK) && sym == 2 && !(b.seen >> cell & 1))) {
+        int over = iso::height((b.flags & F_GOBBLE) ? iso::chipArt(b.n == 9, levelOf(on)) : iso::art(b.n == 9, sym)) + 4;
+        if (over > lift) lift = over;
+    }
+    hover = (uint8_t)lift;
+    if (a) {
+        cy -= lift + iso::height(a) - 3;                 // pinching the top of the piece it holds
+        int top = cy - 16 - camY;                        // the glove's top, the board unlowered
+        camT = (int8_t)(top < 13 ? 13 - top : 0);
+        cy += camT - camY;                               // where it will be once the board is down
+    }
     y = (int16_t)((cy - (isoOn(b) ? 1 : radius(b) / 2)) << 4);
 }
 
@@ -358,6 +399,7 @@ void reset(const Match &m) {
     alertT = busyT = strikeT = tossT = quipT = 0;
     catT = 0;
     dropT = 0; dropCell = NONE;
+    camY = camT = 0;
     lastPhase = 0xFF;
     lastSig = 0;
     dirty = true;
@@ -386,6 +428,7 @@ void onEvents(const Match &m) {
             case EV_START:
                 strikeT = 0;
                 dropT = 0; dropCell = NONE;
+    camY = camT = 0;
                 if (isoOn(b)) introT = 18;
                 break;
             case EV_TOSS:
@@ -432,7 +475,7 @@ void onEvents(const Match &m) {
                 else if (need == 1) { landText = "TAC"; landSfx = Sfx::Tac; }
                 else if (need == 2 && b.n == 9) { landText = "TIC"; landSfx = Sfx::Tic; }
                 dropCell = e.a;
-                if (isoOn(b)) { dropT = 12; busyT = 14; gloveOn = false; break; }
+                if (isoOn(b)) { dropT = 12; busyT = 14; gloveOn = false; dropFrom = hover; break; }
                 dropT = 1;                                    // the map: it lands at once
                 if (!e.b && !b.result && !m.two) {       // the dealer has opinions
                     uint32_t r = fx::rnd();
@@ -500,12 +543,17 @@ void update(const Match &m) {
     fx::update();
     if (introT && !--introT) {                           // the board lands: thump
         fx::shake(6, 2);
-        fx::burst(fx::DUST, 6, 70, 6, 20, SILVER);
-        fx::burst(fx::DUST, 122, 70, 6, 20, SILVER);
-        fx::burst(fx::DUST, 64, 104, 8, 24, SILVER);
+        fx::burst(fx::DUST, 64, 104, 12, 40, SILVER);
         audio::sfx(Sfx::Place);
     }
     if (dropT && --dropT == (isoOn(b) ? 7 : 0) && dropCell != NONE) land(b);
+    if (m.phase != Phase::Human && m.phase != Phase::Reach && m.phase != Phase::Settle) camT = 0;
+    if (!isoOn(b)) camT = camY = 0;
+    if (camY != camT) {                                  // the board glides
+        int d = camT - camY;
+        camY = (int8_t)(camY + (d > 2 ? (d + 1) / 2 : (d < -2 ? (d - 1) / 2 : d)));
+        dirty = true;
+    }
     if (!dropT) dropCell = NONE;
     if (busyT) busyT--;
     if (alertT) alertT--;
@@ -569,7 +617,7 @@ static bool inLine(const Board &b, uint8_t cell) {
 static void drawIso(const Match &m, const Casino &c, uint32_t frame) {
     const Board &b = m.b;
     iso::View v = iso::view(b, introLift());
-    iso::drawRoom();
+    iso::drawRoom(NAVY, BLUE);
     drawSides(m, c);
     iso::drawBoard(v);
     if (m.phase == Phase::Human) iso::padBorder(v, m.cur, b.n == 9 ? 3 : 2, FX_B, FX_B, 0);
@@ -590,14 +638,14 @@ static void drawIso(const Match &m, const Casino &c, uint32_t frame) {
             int cx, cy;
             iso::cellPos(v, cell, cx, cy);
             if (sym == 3) {                              // MINES: a scorched hole in the felt
-                gfx_fillEllipse(cx, cy, v.hh, v.hh / 2, INK);
-                gfx_ellipse(cx, cy, v.hh, v.hh / 2, WINE);
+                gfx_fillEllipse(cx, cy, v.hh, v.hh / 2, WINE);
+                gfx_fillEllipse(cx, cy, v.hh - 1, v.hh / 2 - 1, INK);
                 gfx_hline(cx - 2, cy - 1, 4, WOOD);
                 continue;
             }
             bool hot = cell == fading || inLine(b, cell);
             int lift = 0;
-            if (cell == dropCell && dropT) lift = (HOLD * (256 - fx::ease(fx::OUT_BOUNCE, 12 - dropT, 12))) >> 8;
+            if (cell == dropCell && dropT) lift = (dropFrom * (256 - fx::bounce(12 - dropT, 12))) >> 8;
             else if (hop && inLine(b, cell)) {
                 int a = fx::isin((int)(frame * 12) - cx * 2);
                 if (a > 0) lift = (a * (v.big ? 6 : 4)) >> 8;
@@ -658,7 +706,7 @@ bool render(const Match &m, const Casino &c, uint32_t frame) {
 
     if (isoOn(b)) drawIso(m, c, frame);
     else {
-        gfx_fillRect(0, BOARD_Y0, 128, BOARD_Y1 - BOARD_Y0, FELT);
+        iso::drawRoom(FELT_DK, FELT);                    // the felt, darker away from the light
         if (b.d > 1) drawTower(); else drawGrid(b);
         drawMarks(m);
         if (b.n == 9) drawSides(m, c);
@@ -687,8 +735,8 @@ bool render(const Match &m, const Casino &c, uint32_t frame) {
     if (tossT) {                                         // the coin, turning over as it flies
         int cy = 70 - ((fx::isin(tossT * 128 / 44) * 34) >> 8);
         int ry = tossT > 36 ? 9 : 1 + (((fx::isin(tossT * 26) < 0 ? -fx::isin(tossT * 26) : fx::isin(tossT * 26)) * 8) >> 8);
-        gfx_fillEllipse(64, cy, 9, ry, GOLD);
-        gfx_ellipse(64, cy, 9, ry, WOOD);
+        gfx_fillEllipse(64, cy, 9, ry, WOOD);
+        gfx_fillEllipse(64, cy, 8, ry > 1 ? ry - 1 : ry, GOLD);
         if (tossT > 36) mark(64, cy, 4, (uint8_t)(tossWho + 1), tossWho ? BLUE : RED);
     }
     if (catT) sprite4((catT & 8) ? CAT1 : CAT2, (int)catT - 18, isoOn(b) ? 105 : 104, RM_ID);
@@ -700,7 +748,7 @@ bool render(const Match &m, const Casino &c, uint32_t frame) {
         if (!moving && (m.phase == Phase::Human || m.phase == Phase::Reach)) {
             int cx, cy;
             cellPos(b, m.phase == Phase::Human ? m.cur : m.pend.cell, cx, cy);
-            iso::shadow(held, cx, cy, HOLD);
+            iso::shadow(held, cx, cy, hover);
         }
         iso::stand(held, hx, hy, 0, hrm, false);
     }

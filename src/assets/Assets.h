@@ -14,13 +14,13 @@ extern const uint8_t HAND[111];  // the glove 13x16, row spans; fingertip on the
 constexpr int HAND_TIP = 5;  // the fingertip's column
 extern const uint8_t CAT1[57];  // the cat 18x10, row spans
 extern const uint8_t CAT2[57];  // the cat 18x10, row spans
-extern const uint8_t X_L[234];  // x_l 29x27, row spans, then the base centre x, y
-extern const uint8_t O_L[189];  // o_l 25x23, row spans, then the base centre x, y
+extern const uint8_t X_L[214];  // x_l 27x25, row spans, then the base centre x, y
+extern const uint8_t O_L[168];  // o_l 23x21, row spans, then the base centre x, y
 extern const uint8_t CHIP0_L[71];  // chip0_l 15x11, row spans, then the base centre x, y
 extern const uint8_t CHIP1_L[126];  // chip1_l 21x16, row spans, then the base centre x, y
 extern const uint8_t CHIP2_L[149];  // chip2_l 27x19, row spans, then the base centre x, y
-extern const uint8_t X_S[132];  // x_s 19x17, row spans, then the base centre x, y
-extern const uint8_t O_S[114];  // o_s 17x15, row spans, then the base centre x, y
+extern const uint8_t X_S[115];  // x_s 17x15, row spans, then the base centre x, y
+extern const uint8_t O_S[99];  // o_s 15x13, row spans, then the base centre x, y
 extern const uint8_t CHIP0_S[46];  // chip0_s 11x8, row spans, then the base centre x, y
 extern const uint8_t CHIP1_S[59];  // chip1_s 13x11, row spans, then the base centre x, y
 extern const uint8_t CHIP2_S[88];  // chip2_s 17x13, row spans, then the base centre x, y

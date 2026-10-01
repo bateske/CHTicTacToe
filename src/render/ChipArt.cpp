@@ -26,8 +26,8 @@ void chip(int cx, int y, uint8_t d, bool top) {
     for (int i = -4; i <= 4; i += 4) gfx_vline(cx + i, y + 2, 2, e);
     gfx_hline(cx - 5, y + 4, 11, INK);
     if (!top) return;
+    gfx_fillEllipse(cx, y + 1, 7, 3, INK);                // the outline, then the face inside it
     gfx_fillEllipse(cx, y + 1, 6, 2, b);
-    gfx_ellipse(cx, y + 1, 7, 2, INK);
     gfx_pixel(cx - 4, y + 1, e); gfx_pixel(cx + 4, y + 1, e);
     gfx_pixel(cx, y, e); gfx_pixel(cx, y + 2, e);
 }

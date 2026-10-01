@@ -13,7 +13,7 @@ void fountain(Kind k, int x, int y, uint8_t n);                            // co
 bool particles();                   // any still flying
 
 // Big centred lettering with an outline; pops in, holds, blinks out.
-enum BannerStyle : uint8_t { B_RAINBOW, B_GOLD, B_RED, B_CYAN, B_WHITE, B_BLACK, B_GREEN };
+enum BannerStyle : uint8_t { B_RAINBOW, B_RED, B_CYAN };
 void banner(const char *text, BannerStyle s, int cy, uint8_t frames = 70);
 void holdBanner(bool on);            // keep the banner up (before it blinks out) until false
 bool bannerActive();

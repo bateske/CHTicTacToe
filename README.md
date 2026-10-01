@@ -13,8 +13,10 @@ the winning line struck through in rainbow, and a cat that walks across
 the felt whenever nobody wins. The 3x3 and 5x5 tables are played in
 CHChess's isometric view: a walnut board with gold-inlaid lines and felt
 pads under a spotlight, lacquered Xs and Os standing on it, each carried
-in by a glove and dropped with a bounce. SELECT flips to a flat map of the
-board.
+in by a glove and dropped with a bounce. A piece held over one already on
+the board rises clear of it, and the board lowers itself when a piece
+needs the headroom. SELECT flips to a flat map: the same walnut board seen
+from above, its felt pads shaded and gold-inlaid, on spotlit felt.
 
 | Title | The tables | A win |
 |---|---|---|
@@ -110,7 +112,7 @@ are not offered, since they need a clock or a secret.
 
 ## How it fits
 
-- **Flash**: 50,052 B release (both save pages kept). One board type (up to
+- **Flash**: 50,168 B release (both save pages kept, 264 B spare). One board type (up to
   99 cells, a line length, rule flags) and one line scanner serve every
   table, so a new table is mostly a flag and a paragraph. The iso view is
   about 6 KB of it. Device debug builds (the protocol is ~1.7 KB) leave out
