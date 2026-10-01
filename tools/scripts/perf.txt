@@ -1,0 +1,50 @@
+# Render cost screen by screen (host time, scaled by cal to device ms).
+#   python tools/chsim/chdrive.py --sim . tools/scripts/perf.txt out/perf
+cal
+say R 7
+say J T
+wait 100
+perf
+say J G 0
+wait 100
+perf
+say J P 0
+wait 40
+perf
+tap A
+wait 100
+perf
+say J P 15
+wait 40
+tap A
+wait 100
+perf
+say J P 16
+wait 40
+tap A
+wait 100
+perf
+say J P 14
+wait 40
+tap A
+wait 100
+perf
+say J P 13
+wait 40
+tap A
+wait 100
+perf
+say D 0
+say J P 0
+wait 60
+say C 0
+wait 100
+say C 4
+wait 100
+say C 8
+perf
+wait 120
+perf
+say J W
+wait 100
+perf
