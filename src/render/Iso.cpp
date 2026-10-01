@@ -10,7 +10,7 @@ namespace iso {
 static const int ROOM_Y0 = 12, ROOM_Y1 = 116;          // between the bars
 
 __attribute__((noinline)) bool fits(const Board &b) {
-    return b.d == 1 && b.w == b.h && (b.n == 9 || b.n == 25) && !(b.flags & (F_ULTIMATE | F_GRAVITY));
+    return b.w == b.h && (b.n == 9 || b.n == 25) && !(b.flags & (F_ULTIMATE | F_GRAVITY));
 }
 
 __attribute__((noinline)) View view(const Board &b, int lift) {
@@ -179,10 +179,18 @@ void shadow(const uint8_t *a, int x, int y, int lift) {
     else gfx_fillEllipse(x + 1, y, rx, ry > 1 ? ry : 1, FELT_DK);
 }
 
-void stand(const uint8_t *a, int x, int y, int lift, const uint8_t *remap, bool withShadow) {
+void stand(const uint8_t *a, int x, int y, int lift, const uint8_t *remap, bool withShadow, bool mirror) {
     const uint8_t *p = anchor(a);
     if (withShadow) shadow(a, x, y, lift);
-    sprite4(a, x - p[0], y - p[1] - lift, remap);
+    sprite4(a, x - (mirror ? a[0] - 1 - p[0] : p[0]), y - p[1] - lift, remap, mirror ? -256 : 256);
+}
+
+const uint8_t *spin(const uint8_t *a, uint8_t step, bool &mirror) {
+    static const uint8_t *const XS[3] = {X_L, X_L1, X_L2}, *const OS[3] = {O_L, O_L1, O_L2};
+    const uint8_t *const *t = a == X_L ? XS : (a == O_L ? OS : nullptr);
+    mirror = step == 3;
+    if (!t) return a;
+    return t[mirror ? 1 : step];
 }
 
 }  // namespace iso

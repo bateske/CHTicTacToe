@@ -18,7 +18,7 @@ void allowWrites(bool) {}
 #else
 
 static const uint32_t MAGIC = 0x54544843u;       // "CHTT"
-static const uint8_t VERSION = 1;
+static const uint8_t VERSION = 2;           // 2: TOWER gone (stats per table)
 static const uint32_t PAGE = 256;
 static const uint32_t PAGE_A = 0xF500, PAGE_B = 0xF600;   // metadata page is 0xF700
 

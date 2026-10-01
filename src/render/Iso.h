@@ -34,7 +34,10 @@ const uint8_t *art(bool big, uint8_t sym);
 const uint8_t *chipArt(bool big, uint8_t level);
 // Draw art with its base centre at (x, y) (lift px up), and its shadow on
 // the felt beneath (shadow = false: none, it's in the air over its own).
-void stand(const uint8_t *art, int x, int y, int lift, const uint8_t *remap, bool shadow = true);
+void stand(const uint8_t *art, int x, int y, int lift, const uint8_t *remap, bool shadow = true, bool mirror = false);
+// The 3x3 X or O turned about its upright: step 0..3 = 0, 45, 90, 135
+// degrees (the last is the 45 degree art mirrored). Other art is returned as is.
+const uint8_t *spin(const uint8_t *art, uint8_t step, bool &mirror);
 void shadow(const uint8_t *art, int x, int y, int lift);   // just its shadow
 int height(const uint8_t *art);                            // rows above its base
 

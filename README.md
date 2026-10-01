@@ -6,15 +6,16 @@ RISC-V, 128x128 colour LCD, piezo), in the casino style of
 [CHBlackjack](https://github.com/bateske/CHBlackjack),
 [CHChess](https://github.com/bateske/CHChess) and
 [CHRoulette](https://github.com/bateske/CHRoulette). The world's simplest
-game gets the VIP room: seventeen tables with seventeen sets of rules, a
+game gets the VIP room: sixteen tables with sixteen sets of rules, a
 stake on every game, the croupier from Blackjack's tables explaining each
 one with a straight face, "TIC", "TAC" and "TOE!" called as a line builds,
 the winning line struck through in rainbow, and a cat that walks across
 the felt whenever nobody wins. The 3x3 and 5x5 tables are played in
 CHChess's isometric view: a walnut board with gold-inlaid lines and felt
 pads under a spotlight, lacquered Xs and Os standing on it, each carried
-in by a glove and dropped with a bounce. A piece held over one already on
-the board rises clear of it, and the board lowers itself when a piece
+in by a glove and dropped with a bounce. The piece in your glove spins on its
+axis; held over one already on the board it rises clear of it and casts
+its shadow on it, and the board lowers itself when a piece
 needs the headroom. SELECT flips to a flat map: the same walnut board seen
 from above, its felt pads shaded and gold-inlaid, on spotlit felt.
 
@@ -25,8 +26,8 @@ from above, its felt pads shaded and gold-inlaid, on spotlit felt.
 | ![title](docs/title.gif) | ![tables](docs/tables.gif) | ![classic](docs/classic.gif) |
 | **VANISH** | **COIN FLIP** | **A cat's game** |
 | ![vanish](docs/vanish.gif) | ![coin](docs/coin.gif) | ![cat](docs/cat.gif) |
-| **TOWER** | **ULTIMATE** | **THE 99** |
-| ![tower](docs/tower.gif) | ![ultimate](docs/ultimate.gif) | ![the99](docs/the99.gif) |
+| **The spin** | **ULTIMATE** | **THE 99** |
+| ![spin](docs/spin.gif) | ![ultimate](docs/ultimate.gif) | ![the99](docs/the99.gif) |
 
 (Captured from the PC simulator in `tools/chsim`, which runs the real game
 and graphics code and renders what the device shows.)
@@ -63,7 +64,7 @@ the last two flash pages for saving. From the command line:
 
 | Button | At a table | Elsewhere |
 |---|---|---|
-| D-pad | move the glove; on the iso tables it goes to the nearest cell that way on screen (TOWER: up and down past a floor's edge changes floor) | menus; in the tables room left/right picks the table, up/down the stake |
+| D-pad | move the glove; on the iso tables it goes to the nearest cell that way on screen | menus; in the tables room left/right picks the table, up/down the stake |
 | A | place your mark | select |
 | B | GOBBLE: next size; WILD: place an O | back |
 | SELECT | 3x3 and 5x5 tables: the iso table or the flat map (it stays as you leave it); other tables: the rules | |
@@ -92,9 +93,8 @@ run ends when you reach the goal ($1000 by default) or can't cover $5.
 | 12 | WRAP | 5x5, four in a row, and lines continue round the edges | 1:1 |
 | 13 | MINES | 5x5, four in a row; four hidden mines: a mark put on one is lost and the cell is dead | 3:1 |
 | 14 | DROP 4 | 7x6, marks fall to the bottom of their column, four in a row | 2:1 |
-| 15 | TOWER | 4x4x4, four in a row along any of the 76 lines | 3:1 |
-| 16 | ULTIMATE | nine 3x3 boards; the square you play picks the board the other side must play in; three boards in a row wins (all boards decided: most boards) | 5:1 |
-| 17 | THE 99 | 11x9 = 99 squares, five in a row | 5:1 |
+| 15 | ULTIMATE | nine 3x3 boards; the square you play picks the board the other side must play in; three boards in a row wins (all boards decided: most boards) | 5:1 |
+| 16 | THE 99 | 11x9 = 99 squares, five in a row | 5:1 |
 
 You move first, except in BLITZ, where the opening alternates.
 
@@ -114,7 +114,7 @@ are not offered, since they need a clock or a secret.
 
 ## How it fits
 
-- **Flash**: 50,168 B release (both save pages kept, 264 B spare). One board type (up to
+- **Flash**: 50,308 B release (both save pages kept, 124 B spare). One board type (up to
   99 cells, a line length, rule flags) and one line scanner serve every
   table, so a new table is mostly a flag and a paragraph. The iso view is
   about 6 KB of it. Device debug builds (the protocol is ~1.7 KB) leave out

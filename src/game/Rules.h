@@ -1,12 +1,12 @@
 // The rules of every table. One board type covers them all: up to 99 cells
-// in a w x h x d lattice, a line length k, and a few rule flags. Pure: no
+// in a w x h grid, a line length k, and a few rule flags. Pure: no
 // graphics, no clock; host-tested (tools/tests).
 #pragma once
 #include <stdint.h>
 
 enum Mode : uint8_t {
     M_CLASSIC, M_BLITZ, M_MISERE, M_ALLX, M_VANISH, M_GOBBLE, M_WILD, M_DARK, M_COIN, M_AUCTION,
-    M_BIG5, M_WRAP, M_MINES, M_DROP, M_TOWER, M_ULTIMATE, M_99, MODE_COUNT
+    M_BIG5, M_WRAP, M_MINES, M_DROP, M_ULTIMATE, M_99, MODE_COUNT
 };
 
 enum : uint16_t {
@@ -25,11 +25,11 @@ enum : uint16_t {
     F_MINES = 4096,     // hidden mines: a mark put on one is lost, and the cell with it
 };
 
-struct ModeDef { uint8_t w, h, d, k; uint16_t flags; uint8_t payNum, payDen; };
+struct ModeDef { uint8_t w, h, k; uint16_t flags; uint8_t payNum, payDen; };
 extern const ModeDef MODES[MODE_COUNT];
 
-struct Dir { int8_t dx, dy, dz; };
-extern const Dir DIRS[13];              // the first 4 lie in one plane
+struct Dir { int8_t dx, dy; };
+extern const Dir DIRS[4];
 extern const uint8_t LINES3[8][3];      // the eight lines of a 3x3
 
 enum Result : uint8_t { R_NONE, R_P0, R_P1, R_DRAW };   // P0 the player, P1 the dealer
@@ -45,7 +45,7 @@ struct Board {
     uint16_t seen;                  // DARK: the dealer's marks found so far, a bit a cell
     uint32_t mines;                 // MINES: a bit a cell (laid by Match::start); a blown cell holds 3
     uint8_t boom;                   // MINES: the last move found one
-    uint8_t w, h, d, k, n;
+    uint8_t w, h, k, n;
     uint8_t turn;                   // side to move: 0 the player, 1 the dealer
     uint8_t result;                 // Result
     uint8_t left;                   // empty cells

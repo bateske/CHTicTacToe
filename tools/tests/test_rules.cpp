@@ -120,29 +120,6 @@ static void testBig() {
     CHECK_EQ(b.run, 5);
 }
 
-static void testTower() {
-    // 76 lines, and each one wins.
-    int lines = 0;
-    for (int cell = 0; cell < 64; cell++) {
-        int x = cell % 4, y = cell / 4 % 4, z = cell / 16;
-        for (int i = 0; i < 13; i++) {
-            const Dir &d = DIRS[i];
-            int ex = x + 3 * d.dx, ey = y + 3 * d.dy, ez = z + 3 * d.dz;
-            if (ex < 0 || ex > 3 || ey < 0 || ey > 3 || ez < 0 || ez > 3) continue;
-            lines++;
-            int step = d.dx + d.dy * 4 + d.dz * 16;
-            for (int last = 0; last < 4; last++) {
-                Board b;
-                rules::start(b, M_TOWER);
-                for (int j = 0; j < 4; j++) if (j != last) b.cell[cell + j * step] = 1;
-                rules::play(b, (uint8_t)(cell + last * step), 0);
-                CHECK_EQ(b.result, R_P0);
-            }
-        }
-    }
-    CHECK_EQ(lines, 76);
-}
-
 static void testUltimate() {
     Board b;
     rules::start(b, M_ULTIMATE);
@@ -348,7 +325,6 @@ int main(int argc, char **argv) {
     testGobble();
     testWild();
     testBig();
-    testTower();
     testUltimate();
     testNewTables();
     testDealer(argc > 1);

@@ -66,27 +66,19 @@ wait 110
 tap A
 wait 150
 rec stop coin
-# TOWER.
-say J P 14
-rec start 3
+# A held X spinning, over an empty pad and then over the dealer's O.
+say J P 0
 wait 40
+say H 8
 tap A
-wait 80
-tap UP
-tap UP
-tap UP
-tap A
-wait 80
-tap UP
-tap UP
-tap UP
-tap UP
-tap RIGHT
-tap A
-wait 80
-rec stop tower
+wait 90
+rec start 1
+wait 24
+tap DOWN
+wait 30
+rec stop spin
 # ULTIMATE.
-say J P 15
+say J P 14
 rec start 3
 wait 40
 tap A
@@ -101,7 +93,7 @@ tap A
 wait 90
 rec stop ultimate
 # THE 99.
-say J P 16
+say J P 15
 rec start 3
 wait 40
 tap A

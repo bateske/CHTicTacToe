@@ -126,20 +126,18 @@ static const int16_t DEFEND[5] = {5000, 200, 20, 3, 1};
 // What the cell is worth to side: every k-window through it that only one
 // side has marks in, by how close that side is to filling it.
 static int32_t scoreCell(const Board &b, uint8_t cell, uint8_t side, int x0, int y0, int x1, int y1, bool blind) {
-    int plane = b.w * b.h;
-    int x = cell % b.w, y = cell / b.w % b.h, z = cell / plane;
+    int x = cell % b.w, y = cell / b.w;
     int32_t total = 0;
     bool wrap = (b.flags & F_WRAP) != 0;
-    for (uint8_t i = 0; i < (b.d > 1 ? 13 : 4); i++) {
+    for (uint8_t i = 0; i < 4; i++) {
         const Dir &d = DIRS[i];
         for (int o = 0; o < b.k; o++) {
-            int sx = x - o * d.dx, sy = y - o * d.dy, sz = z - o * d.dz;
-            int ex = sx + (b.k - 1) * d.dx, ey = sy + (b.k - 1) * d.dy, ez = sz + (b.k - 1) * d.dz;
-            if (!wrap && (sx < x0 || sx >= x1 || ex < x0 || ex >= x1 || sy < y0 || sy >= y1 || ey < y0 || ey >= y1 ||
-                          sz < 0 || sz >= b.d || ez < 0 || ez >= b.d)) continue;
+            int sx = x - o * d.dx, sy = y - o * d.dy;
+            int ex = sx + (b.k - 1) * d.dx, ey = sy + (b.k - 1) * d.dy;
+            if (!wrap && (sx < x0 || sx >= x1 || ex < x0 || ex >= x1 || sy < y0 || sy >= y1 || ey < y0 || ey >= y1)) continue;
             uint8_t mine = 0, theirs = 0;
             for (int j = 0; j < b.k; j++) {
-                int c = (sz + j * d.dz) * plane + (sy + j * d.dy + 8 * b.h) % b.h * b.w + (sx + j * d.dx + 8 * b.w) % b.w;
+                int c = (sy + j * d.dy + 8 * b.h) % b.h * b.w + (sx + j * d.dx + 8 * b.w) % b.w;
                 uint8_t t = topOf(b.cell[c]);
                 if (t == side + 1) mine++;
                 else if (t) theirs++;

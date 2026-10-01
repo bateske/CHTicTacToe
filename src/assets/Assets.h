@@ -19,6 +19,10 @@ extern const uint8_t O_L[168];  // o_l 23x21, row spans, then the base centre x,
 extern const uint8_t CHIP0_L[71];  // chip0_l 15x11, row spans, then the base centre x, y
 extern const uint8_t CHIP1_L[126];  // chip1_l 21x16, row spans, then the base centre x, y
 extern const uint8_t CHIP2_L[149];  // chip2_l 27x19, row spans, then the base centre x, y
+extern const uint8_t X_L1[232];  // x_l1 23x31, row spans, then the base centre x, y
+extern const uint8_t X_L2[189];  // x_l2 9x33, row spans, then the base centre x, y
+extern const uint8_t O_L1[181];  // o_l1 19x22, row spans, then the base centre x, y
+extern const uint8_t O_L2[122];  // o_l2 9x22, row spans, then the base centre x, y
 extern const uint8_t X_S[115];  // x_s 17x15, row spans, then the base centre x, y
 extern const uint8_t O_S[99];  // o_s 15x13, row spans, then the base centre x, y
 extern const uint8_t CHIP0_S[46];  // chip0_s 11x8, row spans, then the base centre x, y

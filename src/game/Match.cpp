@@ -14,7 +14,7 @@ void Match::start(Mode m, uint8_t lvl, bool twoPlayers) {
     two = twoPlayers;
     rules::start(b, m);
     first = 0;
-    cur = (uint8_t)(b.w / 2 + b.w * (b.h / 2));          // the centre (TOWER: of the ground floor)
+    cur = (uint8_t)(b.w / 2 + b.w * (b.h / 2));          // the centre
     if (b.flags & F_GRAVITY) cur = (uint8_t)(b.w / 2);   // DROP 4: the cursor rides the top row
     if (b.flags & F_MINES)
         for (uint8_t i = 0; i < MINE_COUNT;) {
@@ -106,18 +106,14 @@ void Match::nudgeIso(uint8_t rep) {
 
 void Match::nudge(uint8_t rep) {
     if (iso) { nudgeIso(rep); return; }
-    int plane = b.w * b.h;
-    int x = cur % b.w, y = cur / b.w % b.h, z = cur / plane;
+    int x = cur % b.w, y = cur / b.w;
     if (rep & K_LEFT) x--;
     if (rep & K_RIGHT) x++;
     if (rep & K_UP) y--;
     if (rep & K_DOWN) y++;
-    // TOWER: off the back of a floor is the floor above, off the front the one below.
-    if (y < 0 && z + 1 < b.d) { z++; y = b.h - 1; }
-    if (y >= b.h && z > 0) { z--; y = 0; }
     if (b.flags & F_GRAVITY) y = 0;
     if (x < 0 || x >= b.w || y < 0 || y >= b.h) return;
-    uint8_t c = (uint8_t)(z * plane + y * b.w + x);
+    uint8_t c = (uint8_t)(y * b.w + x);
     if (c != cur) { cur = c; emit(EV_MOVE); }
 }
 

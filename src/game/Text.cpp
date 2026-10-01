@@ -2,7 +2,7 @@
 
 const char *const MODE_NAME[MODE_COUNT] = {
     "CLASSIC", "BLITZ", "MISERE", "ALL X", "VANISH", "GOBBLE", "WILD", "DARK", "COIN FLIP", "AUCTION",
-    "BIG 5", "WRAP", "MINES", "DROP 4", "TOWER", "ULTIMATE", "THE 99",
+    "BIG 5", "WRAP", "MINES", "DROP 4", "ULTIMATE", "THE 99",
 };
 
 const char *const MODE_RULES[MODE_COUNT] = {
@@ -20,7 +20,6 @@ const char *const MODE_RULES[MODE_COUNT] = {
     "5x5, four in a\nrow, and lines\nwrap round the\nedges.",
     "5x5, four in a\nrow. Four hidden\nmines eat your\nmove. Good luck.",
     "Marks drop down\nthe column.\nFour in a row\nwins.",
-    "Four floors of\n4x4. Line up 4\nin any direction\neven upstairs.",
     "9 boards. Your\nsquare picks my\nnext board. Win\n3 boards in a\nrow.",
     "99 squares.\nFive in a row.\nTake your time.",
 };

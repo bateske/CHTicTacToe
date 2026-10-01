@@ -276,8 +276,6 @@ static void titleRender(uint32_t frame) {
 
     const int by = 42 + (y0 - 79) / 2;
     titleBoard(frame, y0);
-    art::chipStack(22, by + 28, 25 * 3 + 10 * 2, 6);
-    art::chipStack(106, by + 28, 100 + 25 * 2 + 5, 6);
 
     static const char *const LABEL[6] = {"PLAY", "CONTINUE", "NEW GAME", "2 PLAYERS", "OPTIONS", "STATS"};
     dither(6, y0 - 3, 116, 125 - y0, INK, 1);
@@ -337,7 +335,7 @@ static void tablesRender(uint32_t frame) {
     text35x2(4, 54, "<", blink ? GOLD : WOOD);
     text35x2(118, 54, ">", blink ? GOLD : WOOD);
     char buf[28], *p = fmtInt(fmtStr(buf, "TABLE "), casino.mode + 1);
-    p = fmtStr(p, "/17   ");
+    p = fmtStr(p, "/16   ");
     *odds(p, casino.mode) = 0;
     centred35(73, buf, WHITE);
 
@@ -354,7 +352,6 @@ static void tablesRender(uint32_t frame) {
     *fmtMoney(buf, ANTES[casino.ante]) = 0;
     gfx_text(12, 94, buf, GOLD);
     gfx_text(13, 94, buf, GOLD);
-    art::chipStack(48, 102, ANTES[casino.ante], 6);
     panel(66, 82, 54, 28, 3, INK, GOLD);
     text35(70, 85, "PURSE", FELT_LT);
     *fmtMoney(buf, casino.purse) = 0;

@@ -3,30 +3,25 @@
 #include <string.h>
 
 const ModeDef MODES[MODE_COUNT] = {
-    {3, 3, 1, 3, 0, 1, 1},              // CLASSIC
-    {3, 3, 1, 3, F_BLITZ, 1, 1},        // BLITZ (pays by boards won)
-    {3, 3, 1, 3, F_MISERE, 1, 1},       // MISERE
-    {3, 3, 1, 3, F_MISERE | F_SAME, 1, 1},   // ALL X (notakto)
-    {3, 3, 1, 3, F_VANISH, 1, 1},       // VANISH
-    {3, 3, 1, 3, F_GOBBLE, 3, 2},       // GOBBLE
-    {3, 3, 1, 3, F_WILD, 1, 1},         // WILD
-    {3, 3, 1, 3, F_DARK, 2, 1},         // DARK (phantom)
-    {3, 3, 1, 3, F_COIN, 1, 1},         // COIN FLIP
-    {3, 3, 1, 3, F_AUCTION, 2, 1},      // AUCTION
-    {5, 5, 1, 4, 0, 2, 1},              // BIG 5
-    {5, 5, 1, 4, F_WRAP, 1, 1},         // WRAP
-    {5, 5, 1, 4, F_MINES, 3, 1},        // MINES
-    {7, 6, 1, 4, F_GRAVITY, 2, 1},      // DROP 4
-    {4, 4, 4, 4, 0, 3, 1},              // TOWER
-    {9, 9, 1, 3, F_ULTIMATE, 5, 1},     // ULTIMATE
-    {11, 9, 1, 5, 0, 5, 1},             // THE 99
+    {3, 3, 3, 0, 1, 1},              // CLASSIC
+    {3, 3, 3, F_BLITZ, 1, 1},        // BLITZ (pays by boards won)
+    {3, 3, 3, F_MISERE, 1, 1},       // MISERE
+    {3, 3, 3, F_MISERE | F_SAME, 1, 1},   // ALL X (notakto)
+    {3, 3, 3, F_VANISH, 1, 1},       // VANISH
+    {3, 3, 3, F_GOBBLE, 3, 2},       // GOBBLE
+    {3, 3, 3, F_WILD, 1, 1},         // WILD
+    {3, 3, 3, F_DARK, 2, 1},         // DARK (phantom)
+    {3, 3, 3, F_COIN, 1, 1},         // COIN FLIP
+    {3, 3, 3, F_AUCTION, 2, 1},      // AUCTION
+    {5, 5, 4, 0, 2, 1},              // BIG 5
+    {5, 5, 4, F_WRAP, 1, 1},         // WRAP
+    {5, 5, 4, F_MINES, 3, 1},        // MINES
+    {7, 6, 4, F_GRAVITY, 2, 1},      // DROP 4
+    {9, 9, 3, F_ULTIMATE, 5, 1},     // ULTIMATE
+    {11, 9, 5, 0, 5, 1},             // THE 99
 };
 
-const Dir DIRS[13] = {
-    {1, 0, 0}, {0, 1, 0}, {1, 1, 0}, {1, -1, 0},
-    {0, 0, 1}, {1, 0, 1}, {-1, 0, 1}, {0, 1, 1}, {0, -1, 1},
-    {1, 1, 1}, {1, -1, 1}, {-1, 1, 1}, {-1, -1, 1},
-};
+const Dir DIRS[4] = {{1, 0}, {0, 1}, {1, 1}, {1, -1}};
 
 const uint8_t LINES3[8][3] = {
     {0, 1, 2}, {3, 4, 5}, {6, 7, 8}, {0, 3, 6}, {1, 4, 7}, {2, 5, 8}, {0, 4, 8}, {2, 4, 6},
@@ -37,8 +32,8 @@ namespace rules {
 void start(Board &b, Mode m) {
     memset(&b, 0, sizeof b);
     const ModeDef &d = MODES[m];
-    b.w = d.w; b.h = d.h; b.d = d.d; b.k = d.k; b.flags = d.flags;
-    b.n = b.left = (uint8_t)(d.w * d.h * d.d);
+    b.w = d.w; b.h = d.h; b.k = d.k; b.flags = d.flags;
+    b.n = b.left = (uint8_t)(d.w * d.h);
     b.last = b.gone = b.must = b.smallWon = NONE;
     memset(b.win, NONE, sizeof b.win);
     memset(b.stock, 2, sizeof b.stock);
@@ -76,20 +71,19 @@ uint8_t drop(const Board &b, uint8_t cell) {
 // The longest line of who through cell, inside the box x0..x1, y0..y1
 // (exclusive ends; WRAP: no ends); win gets up to five of its cells, in order.
 static uint8_t run(const Board &b, uint8_t cell, uint8_t who, int x0, int y0, int x1, int y1, uint8_t *win) {
-    int plane = b.w * b.h;
-    int x = cell % b.w, y = cell / b.w % b.h, z = cell / plane;
+    int x = cell % b.w, y = cell / b.w;
     bool wrap = (b.flags & F_WRAP) != 0;
     uint8_t best = 0;
-    for (uint8_t i = 0; i < (b.d > 1 ? 13 : 4); i++) {
+    for (uint8_t i = 0; i < 4; i++) {
         const Dir &d = DIRS[i];
         uint8_t n = 1, first = cell;
         for (int sg = 1; sg >= -1; sg -= 2) {
-            int cx = x, cy = y, cz = z;
+            int cx = x, cy = y;
             while (n < 5) {
-                cx += sg * d.dx; cy += sg * d.dy; cz += sg * d.dz;
+                cx += sg * d.dx; cy += sg * d.dy;
                 if (wrap) { cx = (cx + b.w) % b.w; cy = (cy + b.h) % b.h; }
-                else if (cx < x0 || cx >= x1 || cy < y0 || cy >= y1 || cz < 0 || cz >= b.d) break;
-                uint8_t c = (uint8_t)(cz * plane + cy * b.w + cx);
+                else if (cx < x0 || cx >= x1 || cy < y0 || cy >= y1) break;
+                uint8_t c = (uint8_t)(cy * b.w + cx);
                 if (topOf(b.cell[c]) != who) break;
                 n++;
                 if (sg < 0) first = c;
@@ -98,10 +92,10 @@ static uint8_t run(const Board &b, uint8_t cell, uint8_t who, int x0, int y0, in
         if (n <= best) continue;
         best = n;
         // The cells, from the far end back through this one and on.
-        int cx = first % b.w, cy = first / b.w % b.h, cz = first / plane;
+        int cx = first % b.w, cy = first / b.w;
         for (uint8_t j = 0; j < 5; j++) {
-            win[j] = j < n ? (uint8_t)(cz * plane + cy * b.w + cx) : NONE;
-            cx += d.dx; cy += d.dy; cz += d.dz;
+            win[j] = j < n ? (uint8_t)(cy * b.w + cx) : NONE;
+            cx += d.dx; cy += d.dy;
             if (wrap) { cx = (cx + b.w) % b.w; cy = (cy + b.h) % b.h; }
         }
     }

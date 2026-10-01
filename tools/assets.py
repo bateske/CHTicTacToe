@@ -246,8 +246,8 @@ def main():
 
     # The iso pieces: the art, then where its base centre is.
     for sz in ("l", "s"):
-        for nm in ("x", "o", "chip0", "chip1", "chip2"):
-            stem = f"{nm}_{sz}"
+        for nm in ("x", "o", "chip0", "chip1", "chip2") + (("x1", "x2", "o1", "o2") if sz == "l" else ()):
+            stem = f"{nm[0]}_{sz}{nm[1:]}" if len(nm) == 2 else f"{nm}_{sz}"
             img = load_png(ART / "pieces" / f"{stem}.png")
             ax, ay = (int(v) for v in (ART / "pieces" / f"{stem}.anchor").read_text().split())
             o.array(stem.upper(), pack_span4(img) + [ax, ay],

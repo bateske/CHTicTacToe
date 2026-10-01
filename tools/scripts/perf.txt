@@ -50,7 +50,7 @@ wait 3
 tap DOWN
 wait 3
 perf
-say J P 16
+say J P 15
 wait 40
 tap A
 wait 100

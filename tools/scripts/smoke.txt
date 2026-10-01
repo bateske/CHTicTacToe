@@ -97,8 +97,8 @@ tap UP
 tap UP
 tap A
 wait 80
-snap 22_tower
-say J P 15
+snap 22_ultimate2
+say J P 14
 wait 50
 tap A
 wait 80
@@ -108,7 +108,7 @@ tap LEFT
 tap A
 wait 80
 snap 23_ultimate
-say J P 16
+say J P 15
 wait 50
 tap A
 wait 80

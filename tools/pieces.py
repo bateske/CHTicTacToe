@@ -124,7 +124,11 @@ SIZES = {"L": 1.0, "S": 0.62}
 # SIZES (the user's call: they sit inside their tiles, and a piece held over
 # one reads as above it).
 SHRINK = {"x": 2, "o": 2}
-WHICH = {"L": ["x", "o", "chip0", "chip1", "chip2"], "S": ["x", "o", "chip0", "chip1", "chip2"]}
+# The X and O held in a glove on the 3x3 tables spin: frames turned 45 and
+# 90 degrees about the vertical (the game mirrors the first for 135; both
+# shapes repeat every half turn).
+SPIN = [45, 90]
+WHICH = {"L":["x", "o", "chip0", "chip1", "chip2"], "S": ["x", "o", "chip0", "chip1", "chip2"]}
 
 
 # ---------------------------------------------------------------------------
@@ -243,17 +247,29 @@ def main():
             fn, tones = PIECES[name]
             shape, gold, height = fn()
             img, anchor = render(shape, gold, height, tones, SIZES[sz])
+            k = 1.0
             if name in SHRINK:
                 w0, h0 = img.shape[1], img.shape[0]
-                k = 1.0
                 while img.shape[1] > w0 - SHRINK[name] or img.shape[0] > h0 - SHRINK[name]:
                     k -= 0.01
                     img, anchor = render(shape, gold, height, tones, SIZES[sz] * k)
-            stem = f"{name}_{sz.lower()}"
-            to_png(img).save(OUT / f"{stem}.png")
-            (OUT / f"{stem}.anchor").write_text(f"{anchor[0]} {anchor[1]}\n")
-            print(f"{stem}: {img.shape[1]}x{img.shape[0]} anchor {anchor}")
-            tiles.append(img)
+            frames = [(f"{name}_{sz.lower()}", img, anchor)]
+            if name in SHRINK and sz == "L":
+                for i, deg in enumerate(SPIN, 1):
+                    c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+
+                    def turned(p, shape=shape, c=c, s=s):
+                        q = p.copy()
+                        q[:, 0] = c * p[:, 0] + s * p[:, 1]
+                        q[:, 1] = -s * p[:, 0] + c * p[:, 1]
+                        return shape(q)
+                    fi, fa = render(turned, gold, height, tones, SIZES[sz] * k)
+                    frames.append((f"{name}_{sz.lower()}{i}", fi, fa))
+            for stem, im, an in frames:
+                to_png(im).save(OUT / f"{stem}.png")
+                (OUT / f"{stem}.anchor").write_text(f"{an[0]} {an[1]}\n")
+                print(f"{stem}: {im.shape[1]}x{im.shape[0]} anchor {an}")
+                tiles.append(im)
     pad = 4
     W = sum(t.shape[1] + pad for t in tiles) + pad
     H = max(t.shape[0] for t in tiles) + 2 * pad

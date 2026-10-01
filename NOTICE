@@ -18,7 +18,7 @@ src/gfx/Draw.cpp are Press Play On Tape's.
 From CHChess (https://github.com/bateske/CHChess, Apache-2.0): the pointing
 glove, the soft clock ticks and the shake routine.
 
-Everything else - the rules of the seventeen tables, the dealer's play, the
+Everything else - the rules of the sixteen tables, the dealer's play, the
 match flow, the felts and marks, the cat, the title lettering (drafted from
 the Arial Black and Georgia typefaces by tools/make_logo.py) and the
 presentation - is new, under the Apache License 2.0 (LICENSE).

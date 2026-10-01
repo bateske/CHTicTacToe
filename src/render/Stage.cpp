@@ -27,6 +27,7 @@ static int16_t bandLo = 12, bandHi = 116;   // iso: rows the glove, its piece an
 static uint16_t clockSig;               // BLITZ: what its clock showed
 static uint8_t alertT, busyT, strikeT, tossT, tossWho, quipT, lastPhase;
 static uint16_t catT;
+static uint8_t spinT;                   // the held piece's turn, in ticks
 static bool mapView;                    // the strategy map instead of the iso table
 static uint8_t introT;                  // iso: the board dropping onto the carpet
 static uint8_t dropT, dropCell = NONE;  // iso: a piece falling onto its pad
@@ -64,13 +65,7 @@ static int introLift() { return introT * introT / 5 - camY; }
 
 __attribute__((noinline)) static void cellPos(const Board &b, uint8_t cell, int &cx, int &cy) {
     if (isoOn(b)) { iso::cellPos(iso::view(b, introLift()), cell, cx, cy); return; }
-    int x = cell % b.w, y = cell / b.w % b.h;
-    if (b.d > 1) {                                       // TOWER: four slanted floors
-        int z = cell / 16;
-        cx = 34 + x * 16 + (3 - y) * 4;
-        cy = 18 + (3 - z) * 25 + y * 6;
-        return;
-    }
+    int x = cell % b.w, y = cell / b.w;
     Geo g = geo(b);
     bool u = (b.flags & F_ULTIMATE) != 0;
     cx = g.x0 + x * g.cw + (u ? x / 3 : 0) + (g.cw - 1) / 2;
@@ -79,14 +74,14 @@ __attribute__((noinline)) static void cellPos(const Board &b, uint8_t cell, int 
 
 static uint8_t radius(const Board &b) {
     if (isoOn(b)) return b.n == 9 ? 6 : 4;
-    return b.d > 1 ? 2 : geo(b).r;
+    return geo(b).r;
 }
 
 // ---------------------------------------------------------------------------
 // Marks
 // ---------------------------------------------------------------------------
 static void drawX(int cx, int cy, int r, uint8_t c) {
-    int t = r < 3 ? 1 : r / 4, w = r < 3 ? 3 : (r < 5 ? 2 : 2 * t + 1);   // small marks: 2 px strokes; TOWER: 3
+    int t = r / 4, w = r < 5 ? 2 : 2 * t + 1;            // small marks: 2 px strokes
     for (int d = -r; d <= r; d++) {
         gfx_hline(cx + d - t, cy + d, w, c);
         gfx_hline(cx - d - t, cy + d, w, c);
@@ -100,11 +95,6 @@ void mark(int cx, int cy, int r, uint8_t sym, uint8_t colour) {
         return;
     }
     uint8_t c = colour ? colour : CYAN;
-    if (r < 3) {                                         // TOWER: flat on its floor
-        gfx_fillEllipse(cx, cy, 4, 2, c);
-        gfx_hline(cx - 2, cy, 5, FELT_DK);
-        return;
-    }
     if (r < 5) {
         gfx_circle(cx, cy, r, c);
         gfx_circle(cx, cy, r - 1, c);
@@ -120,21 +110,6 @@ void mark(int cx, int cy, int r, uint8_t sym, uint8_t colour) {
 // ---------------------------------------------------------------------------
 // The felt
 // ---------------------------------------------------------------------------
-static void drawTower() {
-    for (int z = 0; z < 4; z++) {
-        int ly = 15 + (3 - z) * 25;
-        // A felt floor on a wooden plate: its front edge, then the floor,
-        // lit along the back, then its lines.
-        gfx_fillRect(24, ly + 25, 65, 2, WOOD);
-        gfx_hline(24, ly + 27, 65, WINE);
-        for (int yy = 0; yy <= 24; yy++) gfx_hline(40 - yy * 2 / 3, ly + yy, 65, yy < 2 ? FELT_LT : FELT);
-        for (int r = 0; r <= 4; r++) gfx_hline(40 - 4 * r, ly + r * 6, 65, (r == 0 || r == 4) ? GOLD : FELT_DK);
-        for (int c = 0; c <= 4; c++) gfx_line(40 + c * 16, ly, 24 + c * 16, ly + 24, (c == 0 || c == 4) ? GOLD : FELT_DK);
-        char f[3] = {(char)('1' + z), 'F', 0};
-        text35(8, ly + 10, f, GOLD);
-    }
-}
-
 // The flat map: the iso table's board seen from above - a wooden frame with
 // gold trim and its shadow on the felt, felt pads set into the wood (in
 // shadow along the top and left, catching the light bottom and right), and
@@ -301,10 +276,6 @@ static void drawSides(const Match &m, const Casino &c) {
             char buf[4];
             *fmtInt(buf, n) = 0;
             text35(x + dir * 16 - (s ? text35Width(buf) : 0), 108, buf, WHITE);
-        } else if (!(b.flags & F_BLITZ) && !m.two) {    // the stakes: yours, and what the house puts up
-            const ModeDef &d = MODES[m.mode];
-            int32_t ante = ANTES[c.ante];
-            art::chipStack(x + dir * 12, 110, s ? ante * d.payNum / d.payDen * (m.level + 1) : ante, 6);
         }
     }
     if (b.flags & F_BLITZ) {
@@ -547,6 +518,7 @@ void update(const Match &m) {
         audio::sfx(Sfx::Place);
     }
     if (dropT && --dropT == (isoOn(b) ? 7 : 0) && dropCell != NONE) land(b);
+    if (!(++spinT & 3) && gloveOn && b.n == 9 && isoOn(b) && !(b.flags & F_GOBBLE)) moved = true;   // the next spin frame
     if (m.phase != Phase::Human && m.phase != Phase::Reach && m.phase != Phase::Settle) camT = 0;
     if (!isoOn(b)) camT = camY = 0;
     if (camY != camT) {                                  // the board glides
@@ -626,6 +598,12 @@ static void drawIso(const Match &m, const Casino &c, uint32_t frame) {
     uint8_t fading = NONE;
     if ((b.flags & F_VANISH) && !b.result && b.qn[b.turn] == 3) fading = b.q[b.turn][0];
     bool hop = b.result && fx::bannerActive();
+    // The pad a held piece hangs over: a piece there is in its shadow.
+    const uint8_t *hrm;
+    uint8_t under = NONE;
+    if (gloveOn && !moving && (m.phase == Phase::Human || m.phase == Phase::Reach) &&
+        heldArt(m, m.phase == Phase::Human ? b.turn : 1, hrm))
+        under = m.phase == Phase::Human ? m.cur : m.pend.cell;
     // Back to front: the far corner's diagonal first.
     for (int s = 0; s <= 2 * (v.n - 1); s++) {
         for (int u = 0; u < v.n; u++) {
@@ -651,8 +629,10 @@ static void drawIso(const Match &m, const Casino &c, uint32_t frame) {
                 if (a > 0) lift = (a * (v.big ? 6 : 4)) >> 8;
             }
             const uint8_t *rm = hot ? RM_HOT : RM_ID;
+            bool shaded = cell == under;
+            if (shaded) rm = RM_SHADE;
             if (b.flags & F_GOBBLE) {
-                if (sym == 2) rm = hot ? RM_BLUEHOT : RM_BLUE;
+                if (sym == 2) rm = shaded ? RM_BLUESHADE : (hot ? RM_BLUEHOT : RM_BLUE);
                 iso::stand(iso::chipArt(v.big, levelOf(cv)), cx, cy, lift, rm);
             } else iso::stand(iso::art(v.big, sym), cx, cy, lift, rm);
         }
@@ -707,7 +687,7 @@ bool render(const Match &m, const Casino &c, uint32_t frame) {
     if (isoOn(b)) drawIso(m, c, frame);
     else {
         iso::drawRoom(FELT_DK, FELT);                    // the felt, darker away from the light
-        if (b.d > 1) drawTower(); else drawGrid(b);
+        drawGrid(b);
         drawMarks(m);
         if (b.n == 9) drawSides(m, c);
     }
@@ -717,16 +697,15 @@ bool render(const Match &m, const Casino &c, uint32_t frame) {
     } else if (!b.result && b.last != NONE && b.turn == 0 && !m.two && b.n > 9 && !(b.flags & F_DARK)) {
         int cx, cy;                                      // where the dealer just went
         cellPos(b, b.last, cx, cy);
-        int h = b.d > 1 ? 3 : (geo(b).cw - 1) / 2 - 1;
-        gfx_rect(cx - (b.d > 1 ? 7 : h), cy - h, 2 * (b.d > 1 ? 7 : h) + 1, 2 * h + 1, SILVER);
+        int h = (geo(b).cw - 1) / 2 - 1;
+        gfx_rect(cx - h, cy - h, 2 * h + 1, 2 * h + 1, SILVER);
     }
     if (m.phase == Phase::Human && !isoOn(b)) {         // the cursor's cell
         int cx, cy;
         uint8_t at = m.cur;
         if ((b.flags & F_GRAVITY) && rules::drop(b, at) != NONE) at = rules::drop(b, at);   // where it will land
         cellPos(b, at, cx, cy);
-        if (b.d > 1) gfx_rect(cx - 8, cy - 3, 17, 7, FX_B);
-        else {
+        {
             int h = (geo(b).cw - 1) / 2;
             gfx_rect(cx - h, cy - h, 2 * h + 1, 2 * h + 1, FX_B);
             if (h > 6) gfx_rect(cx - h + 1, cy - h + 1, 2 * h - 1, 2 * h - 1, FX_B);
@@ -745,12 +724,15 @@ bool render(const Match &m, const Casino &c, uint32_t frame) {
                                         ? heldArt(m, m.phase == Phase::Human ? b.turn : 1, hrm) : nullptr;
     if (held) {
         int hx = gx >> 4, hy = (gy >> 4) + iso::height(held) - 2;
-        if (!moving && (m.phase == Phase::Human || m.phase == Phase::Reach)) {
-            int cx, cy;
-            cellPos(b, m.phase == Phase::Human ? m.cur : m.pend.cell, cx, cy);
+        uint8_t at = m.phase == Phase::Human ? m.cur : m.pend.cell;
+        if (!moving && (m.phase == Phase::Human || m.phase == Phase::Reach) && !b.cell[at]) {
+            int cx, cy;                                  // its shadow on the felt (on a piece: the piece is shaded)
+            cellPos(b, at, cx, cy);
             iso::shadow(held, cx, cy, hover);
         }
-        iso::stand(held, hx, hy, 0, hrm, false);
+        bool mirror;
+        const uint8_t *art = iso::spin(held, (uint8_t)((spinT >> 2) & 3), mirror);
+        iso::stand(art, hx, hy, 0, hrm, false, mirror);
     }
     if (gloveOn) {
         const uint8_t *rm = alertT ? RM_ALERT : (gloveCpu ? RM_CPU : RM_ID);

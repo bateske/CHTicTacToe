@@ -24,7 +24,7 @@ void panel(int x, int y, int w, int h, uint8_t r, uint8_t fill, uint8_t edge);
 
 // span4 art (tools/assets.py pack_span4): w, h, then per row a count and
 // (len-1)<<4|colour bytes, colour 15 = skip. Drawn through a remap and
-// scaled (Q8, 256 = 1:1).
+// scaled (Q8, 256 = 1:1; -256 = 1:1 mirrored left to right).
 void sprite4(const uint8_t *data, int x, int y, const uint8_t *remap, int scale = 256);
 
 void dither(int x, int y, int w, int h, uint8_t c, uint8_t phase);      // 50% checker

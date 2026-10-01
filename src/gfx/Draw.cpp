@@ -66,7 +66,7 @@ static inline __attribute__((always_inline)) void pairRun(uint8_t *row, int a, i
 }
 
 RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *remap, int scale) {
-    uint8_t h = d[1];
+    uint8_t w = d[0], h = d[1];
     d += 2;
     uint8_t pair[15];                       // remapped colours, doubled (remap < 16)
     for (int i = 0; i < 15; i++) pair[i] = (uint8_t)(remap[i] * 0x11);
@@ -74,16 +74,18 @@ RAMFUNC(sprite4) void sprite4(const uint8_t *d, int x, int y, const uint8_t *rem
         uint8_t n = *d++;
         const uint8_t *runs = d;
         d += n;
-        if (scale == 256) {
-            // 1:1 (nearly always): a running x.
+        if (scale == 256 || scale == -256) {
+            // 1:1 (nearly always): a running x; mirrored, it runs leftwards
+            // from the right edge.
             if (y + j < drawLo || y + j >= drawHi) continue;
             uint8_t *row = gfx_fb + (y + j) * GFX_FB_STRIDE;
-            int q = x;
+            int dir = scale < 0 ? -1 : 1, q = scale < 0 ? x + w : x;
             for (uint8_t i = 0; i < n; i++) {
                 uint8_t b = runs[i];
                 int len = (b >> 4) + 1;
+                if (dir < 0) q -= len;
                 if ((b & 15) != 15) pairRun(row, q, len, pair[b & 15]);
-                q += len;
+                if (dir > 0) q += len;
             }
             continue;
         }
