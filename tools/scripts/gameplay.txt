@@ -1,0 +1,60 @@
+# A short session for the top of the README: the title, the tables room,
+# a CLASSIC win in iso with a look at the map, then a few moves of BIG 5.
+#   python tools/chsim/chdrive.py --sim . tools/scripts/gameplay.txt docs
+say R 21
+say D 0
+say J T
+rec start 3
+wait 90
+tap A
+wait 60
+tap RIGHT
+wait 40
+tap LEFT
+wait 60
+tap A
+wait 50
+say H 1
+tap A
+wait 110
+say H 2
+tap UP
+wait 6
+tap A
+wait 110
+tap SELECT
+wait 30
+tap SELECT
+wait 10
+tap DOWN
+wait 6
+tap DOWN
+wait 6
+tap A
+wait 160
+tap B
+wait 40
+tap RIGHT
+tap RIGHT
+tap RIGHT
+tap RIGHT
+tap RIGHT
+tap RIGHT
+tap RIGHT
+tap RIGHT
+tap RIGHT
+tap RIGHT
+wait 30
+tap A
+wait 50
+tap A
+wait 100
+tap RIGHT
+wait 6
+tap A
+wait 100
+tap UP
+wait 6
+tap A
+wait 100
+rec stop gameplay

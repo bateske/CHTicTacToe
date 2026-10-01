@@ -18,6 +18,8 @@ the board rises clear of it, and the board lowers itself when a piece
 needs the headroom. SELECT flips to a flat map: the same walnut board seen
 from above, its felt pads shaded and gold-inlaid, on spotlit felt.
 
+![gameplay](docs/gameplay.gif)
+
 | Title | The tables | A win |
 |---|---|---|
 | ![title](docs/title.gif) | ![tables](docs/tables.gif) | ![classic](docs/classic.gif) |
@@ -29,7 +31,7 @@ from above, its felt pads shaded and gold-inlaid, on spotlit felt.
 (Captured from the PC simulator in `tools/chsim`, which runs the real game
 and graphics code and renders what the device shows.)
 
-**Status:** built and tested in the simulator only. It has not been run on
+**Status:** built and tested in the PC simulator only. It has not been run on
 a CHGame yet, so frame times, the dealer's thinking time and every sound
 are unchecked on the device.
 
@@ -144,7 +146,7 @@ are not offered, since they need a clock or a secret.
   C++ compiler: `CHSIM_CXX`, zig, clang++ or g++).
 - `python tools/chsim/chdrive.py --sim . tools/scripts/smoke.txt out/smoke`:
   run a script; `smoke` (every screen and table), `endings`, `save`,
-  `perf`, `showcase` (the GIFs above, into `docs`).
+  `perf`, `hover`, `showcase` and `gameplay` (the GIFs above, into `docs`).
 - `python tools/device.py build|upload [--debug]`, `python tools/check_size.py build/release`.
 - `python tools/assets.py`: rebuild `src/assets` from `tools/art`.
   `python tools/make_logo.py` redrafts the title lettering;
